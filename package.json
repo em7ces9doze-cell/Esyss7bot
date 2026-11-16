@@ -1,8 +1,8 @@
 {
-  "name": "em7-ultimate-v3",
-  "version": "3.0.0",
+  "name": "em7-ultimate",
+  "version": "5.0.0",
   "private": true,
-  "description": "EM7 private Discord control bot",
+  "description": "EM7 ULTIMATE AI Discord Administration",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
