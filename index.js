@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
 
 const client = new Client({
     intents: [
@@ -6,13 +6,14 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildPresences,
         GatewayIntentBits.DirectMessages,
     ]
 });
 
 const TOKEN = process.env.DISCORD_TOKEN || process.env.TOKEN;
 
-// تعريف الأوامر الشاملة
+// تعريف الأوامر الشاملة والأنظمة الاحترافية
 const commands = [
     new SlashCommandBuilder()
         .setName('ping')
@@ -25,6 +26,10 @@ const commands = [
     new SlashCommandBuilder()
         .setName('server-info')
         .setDescription('عرض معلومات تفصيلية عن السيرفر الحالي'),
+
+    new SlashCommandBuilder()
+        .setName('setup-ticket')
+        .setDescription('إرسال لوحة فتح التذاكر الاحترافية في الروم الحالي'),
 
     new SlashCommandBuilder()
         .setName('say')
@@ -79,7 +84,7 @@ client.once('ready', async () => {
     }
 });
 
-// الحماية التلقائية للروابط
+// الحماية التلقائية للروابط والترحيب بالأعضاء الجدد
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
@@ -96,8 +101,91 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// التعامل مع الأوامر
+// الترحيب بالعضو الجديد تلقائياً
+client.on('guildMemberAdd', async member => {
+    const welcomeEmbed = new EmbedBuilder()
+        .setTitle('🎉 عضو جديد انضم إلينا!')
+        .setDescription(`أهلاً بك يا **${member.user.tag}** في سيرفرنا!\nنتمنى لك قضاء وقت ممتع معنا 🤍`)
+        .setColor(0x00FFCC)
+        .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+        .setTimestamp()
+        .setFooter({ text: 'EM7 System', iconURL: client.user.displayAvatarURL() });
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setStyle(ButtonStyle.Link)
+            .setLabel('🔗 انضم لسيرفرنا الأساسي')
+            .setURL('https://discord.gg/qqKG4W6WK')
+    );
+
+    // ابحث عن روم باسم general أو welcome (أو يمديك تخصص رومات لاحقاً)
+    const channel = member.guild.channels.cache.find(ch => ch.name.includes('general') || ch.name.includes('تجارب') || ch.name.includes('welcome'));
+    if (channel) {
+        channel.send({ content: `<@${member.id}>`, embeds: [welcomeEmbed], components: [row] }).catch(() => {});
+    }
+});
+
+// التعامل مع الأوامر والأزرار (التذاكر وغيرها)
 client.on('interactionCreate', async interaction => {
+    // 1. التفاعل مع الأزرار (مثل نظام التذاكر والإغلاق)
+    if (interaction.isButton()) {
+        if (interaction.customId === 'create_ticket') {
+            const guild = interaction.guild;
+            const user = interaction.user;
+
+            // منع فتح أكثر من تذكرة لنفس الشخص (اختياري، أو إنشاء روم جديد مباشرة)
+            try {
+                const ticketChannel = await guild.channels.create({
+                    name: `ticket-${user.username}`,
+                    type: ChannelType.GuildText,
+                    permissionOverwrites: [
+                        {
+                            id: guild.id,
+                            deny: [PermissionFlagsBits.ViewChannel],
+                        },
+                        {
+                            id: user.id,
+                            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory],
+                        },
+                        {
+                            id: client.user.id,
+                            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels],
+                        }
+                    ],
+                });
+
+                const ticketEmbed = new EmbedBuilder()
+                    .setTitle('🎫 تذكرة جديدة')
+                    .setDescription(`أهلاً بك **${user.username}**!\nفضلاً ارحِط مشكلتك أو طلبك، وسيتم الرد عليك من قبل الإدارة قريباً.`)
+                    .setColor(0x5865F2)
+                    .setTimestamp()
+                    .setFooter({ text: 'EM7 Tickets', iconURL: client.user.displayAvatarURL() });
+
+                const closeRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('close_ticket')
+                        .setLabel('🔒 إغلاق التذكرة')
+                        .setStyle(ButtonStyle.Danger)
+                );
+
+                await ticketChannel.send({ content: `<@${user.id}>`, embeds: [ticketEmbed], components: [closeRow] });
+                return interaction.reply({ content: `✅ تم فتح تذكرتك بنجاح: ${ticketChannel}`, ephemeral: true });
+
+            } catch (err) {
+                console.error(err);
+                return interaction.reply({ content: '❌ حدث خطأ أثناء إنشاء التذكرة، تأكد من صلاحيات البوت.', ephemeral: true });
+            }
+        }
+
+        else if (interaction.customId === 'close_ticket') {
+            await interaction.reply({ content: '🔒 جاري إغلاق وحذف التذكرة خلال 5 ثواني...', ephemeral: true });
+            setTimeout(() => {
+                interaction.channel.delete().catch(() => {});
+            }, 5000);
+        }
+        return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const { commandName } = interaction;
@@ -107,7 +195,31 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply(`🏓 Pong! سرعة الاستجابة: **${Math.abs(latency)}ms**`);
     }
 
-    // فحص حالة البوتات بواقعية ودقة عالية
+    // أمر إرسال لوحة التذاكر في الروم
+    else if (commandName === 'setup-ticket') {
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+            return interaction.reply({ content: '❌ عذراً، هذا الأمر مخصص للإدارة فقط!', ephemeral: true });
+        }
+
+        const ticketEmbed = new EmbedBuilder()
+            .setTitle('🎫 نظام الدعم الفني وتذاكر السيرفر')
+            .setDescription('إذا تواجهك أي مشكلة، استفسار، أو تريد التواصل مع الإدارة:\n\n**اضغط على الزر بالأسفل لفتح تذكرة خاصة بك!**')
+            .setColor(0xF1C40F)
+            .setTimestamp()
+            .setFooter({ text: 'EM7 Security & Support', iconURL: client.user.displayAvatarURL() });
+
+        const ticketRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('create_ticket')
+                .setLabel('🎫 فتح تذكرة جديدة')
+                .setStyle(ButtonStyle.Primary)
+        );
+
+        await interaction.channel.send({ embeds: [ticketEmbed], components: [ticketRow] });
+        await interaction.reply({ content: '✅ تم إنشاء لوحة التذاكر في هذا الروم بنجاح!', ephemeral: true });
+    }
+
+    // فحص حالة البوتات بواقعية
     else if (commandName === 'bots-status') {
         await interaction.deferReply();
         
@@ -117,21 +229,16 @@ client.on('interactionCreate', async interaction => {
         let statusText = `🤖 **حالة اتصال البوتات في ${interaction.guild.name}:**\n\n`;
         
         bots.forEach(bot => {
-            // فحص الحالة الواقعية للبوت بناءً على الـ Presence (متصل/أونلاين أو غبر متصل)
-            const presence = bot.presence?.status;
-            let statusEmoji = '🔴'; // مطفي افتراضياً
-            let statusName = 'غير متصل';
+            const status = bot.presence?.status;
+            let statusEmoji = '🟢';
+            let statusName = 'متصل';
 
-            if (presence && presence !== 'offline') {
-                statusEmoji = '🟢';
-                statusName = 'متصل';
-            } else if (!presence || presence === 'offline') {
-                // إذا البوت ما يظهر له بريزنس لكنه موجود في السيرفر
-                statusEmoji = '🟢'; 
-                statusName = 'جاهز';
+            if (!status || status === 'offline') {
+                statusEmoji = '🔴';
+                statusName = 'غير متصل';
             }
 
-            statusText += `${statusEmoji} **${bot.user.username}** — الحالة: *${statusName}* (ID: \`${bot.id}\`)\n`;
+            statusText += `${statusEmoji} **${bot.user.username}** — *${statusName}* (ID: \`${bot.id}\`)\n`;
         });
 
         const statusEmbed = new EmbedBuilder()
@@ -183,7 +290,6 @@ client.on('interactionCreate', async interaction => {
         if (embedTitle) embed.setTitle(embedTitle);
         if (imageUrl) embed.setImage(imageUrl);
 
-        // إضافة الزر التفاعلي إذا اختار المستخدم true
         let componentsArray = [];
         if (shouldAddButton) {
             const inviteButton = new ButtonBuilder()
