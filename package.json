@@ -1,13 +1,4 @@
-{
-  "name": "emsys7-bot",
-  "version": "1.0.0",
-  "description": "Discord System Bot for Emsys7",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "dependencies": {
-    "discord.js": "^14.14.1",
-    "dotenv": "^16.4.5"
-  }
+"dependencies": {
+  "discord.js": "^14.19.3",
+  "@google/genai": "^2.0.0"
 }
