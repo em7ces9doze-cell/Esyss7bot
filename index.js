@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, REST, Routes, SlashCommandBuilder } = require('discord.js');
 
 const client = new Client({
     intents: [
@@ -13,7 +13,6 @@ const client = new Client({
 
 const TOKEN = process.env.DISCORD_TOKEN || process.env.TOKEN;
 
-// تعريف الأوامر الشاملة والأنظمة الاحترافية
 const commands = [
     new SlashCommandBuilder()
         .setName('ping')
@@ -29,43 +28,11 @@ const commands = [
 
     new SlashCommandBuilder()
         .setName('setup-ticket')
-        .setDescription('إرسال لوحة فتح التذاكر الاحترافية في الروم الحالي'),
+        .setDescription('إرسال لوحة التذاكر الاحترافية في الروم الحالي'),
 
     new SlashCommandBuilder()
-        .setName('say')
-        .setDescription('نظام إرسال رسائل Embed احترافي مع زر رابط السيرفر التفاعلي')
-        .addStringOption(option => 
-            option.setName('target')
-                .setDescription('مكان الإرسال: الشات الحالي أو خاص (DM)')
-                .setRequired(true)
-                .addChoices(
-                    { name: 'الشات الحالي (روم)', value: 'channel' },
-                    { name: 'رسالة خاصة (DM)', value: 'dm' }
-                ))
-        .addStringOption(option => 
-            option.setName('message')
-                .setDescription('نص الرسالة أو محتوى الـ Embed')
-                .setRequired(true))
-        .addUserOption(option => 
-            option.setName('user')
-                .setDescription('استهداف شخص معين (يوزر) للإرسال أو المنشن')
-                .setRequired(false))
-        .addStringOption(option => 
-            option.setName('user_id')
-                .setDescription('أو حدد شخص معين عن طريق الـ ID الخاص به')
-                .setRequired(false))
-        .addStringOption(option => 
-            option.setName('title')
-                .setDescription('عنوان الـ Embed (اختياري)')
-                .setRequired(false))
-        .addStringOption(option => 
-            option.setName('image_url')
-                .setDescription('رابط صورة تبي تحطها في الـ Embed (اختياري)')
-                .setRequired(false))
-        .addBooleanOption(option => 
-            option.setName('add_button')
-                .setDescription('هل تريد إضافة زر تفاعلي ينقلهم لسيرفرنا؟ (True / False)')
-                .setRequired(false))
+        .setName('send')
+        .setDescription('لوحة إرسال الرسائل المتقدمة (لروم معين أو رسالة خاصة عبر أزرار)'),
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -84,7 +51,7 @@ client.once('ready', async () => {
     }
 });
 
-// الحماية التلقائية للروابط والترحيب بالأعضاء الجدد
+// حماية الروابط
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
@@ -95,245 +62,273 @@ client.on('messageCreate', async (message) => {
         });
         return;
     }
-
-    if (message.content === 'السلام عليكم' || message.content === 'السلام') {
-        message.reply('وعليكم السلام ورحمة الله وبركاته! نورت سيرفرنا 🤍');
-    }
 });
 
-// الترحيب بالعضو الجديد تلقائياً
-client.on('guildMemberAdd', async member => {
-    const welcomeEmbed = new EmbedBuilder()
-        .setTitle('🎉 عضو جديد انضم إلينا!')
-        .setDescription(`أهلاً بك يا **${member.user.tag}** في سيرفرنا!\nنتمنى لك قضاء وقت ممتع معنا 🤍`)
-        .setColor(0x00FFCC)
-        .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-        .setTimestamp()
-        .setFooter({ text: 'EM7 System', iconURL: client.user.displayAvatarURL() });
-
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setStyle(ButtonStyle.Link)
-            .setLabel('🔗 انضم لسيرفرنا الأساسي')
-            .setURL('https://discord.gg/qqKG4W6WK')
-    );
-
-    // ابحث عن روم باسم general أو welcome (أو يمديك تخصص رومات لاحقاً)
-    const channel = member.guild.channels.cache.find(ch => ch.name.includes('general') || ch.name.includes('تجارب') || ch.name.includes('welcome'));
-    if (channel) {
-        channel.send({ content: `<@${member.id}>`, embeds: [welcomeEmbed], components: [row] }).catch(() => {});
-    }
-});
-
-// التعامل مع الأوامر والأزرار (التذاكر وغيرها)
+// التعامل مع الأوامر والأزرار والمودالات
 client.on('interactionCreate', async interaction => {
-    // 1. التفاعل مع الأزرار (مثل نظام التذاكر والإغلاق)
-    if (interaction.isButton()) {
-        if (interaction.customId === 'create_ticket') {
+    
+    // 1. التعامل مع الأوامر الأساسية (Slash Commands)
+    if (interaction.isChatInputCommand()) {
+        const { commandName } = interaction;
+
+        if (commandName === 'ping') {
+            const latency = Date.now() - interaction.createdTimestamp;
+            await interaction.reply(`🏓 Pong! سرعة الاستجابة: **${Math.abs(latency)}ms**`);
+        }
+
+        else if (commandName === 'send') {
+            if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return interaction.reply({ content: '❌ هذا الأمر مخصص للإدارة فقط!', ephemeral: true });
+            }
+
+            const panelEmbed = new EmbedBuilder()
+                .setTitle('📤 لوحة إرسال الرسائل الاحترافية')
+                .setDescription('اختر الطريقة المناسبة لإرسال رسالتك عبر الأزرار أدناه:\n\n🔹 **إرسال روم**: لإرسال رسالة Embed لروم معين عبر الآي دي.\n🔹 **رسالة خاصة (DM)**: لإرسال رسالة خاصة لعضو عبر الآي دي الخاص به.')
+                .setColor(0x5865F2)
+                .setTimestamp()
+                .setFooter({ text: 'EM7 Panel System', iconURL: client.user.displayAvatarURL() });
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('btn_send_channel')
+                    .setLabel('💬 إرسال روم')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('btn_send_dm')
+                    .setLabel('✉️ رسالة خاصة')
+                    .setStyle(ButtonStyle.Secondary)
+            );
+
+            await interaction.reply({ embeds: [panelEmbed], components: [row], ephemeral: true });
+        }
+
+        else if (commandName === 'setup-ticket') {
+            if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return interaction.reply({ content: '❌ عذراً، هذا الأمر للإدارة فقط!', ephemeral: true });
+            }
+
+            const ticketEmbed = new EmbedBuilder()
+                .setTitle('🎫 نظام الدعم الفني والتذاكر')
+                .setDescription('إذا كان لديك أي استفسار، مشكلة، أو تريد التواصل مع الإدارة:\n\n**اضغط على الزر أدناه لفتح تذكرة خاصة بك.**')
+                .setColor(0xF1C40F)
+                .setTimestamp()
+                .setFooter({ text: 'EM7 Support System', iconURL: client.user.displayAvatarURL() });
+
+            const ticketRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('create_ticket')
+                    .setLabel('🎫 فتح تذكرة جديدة')
+                    .setStyle(ButtonStyle.Success)
+            );
+
+            await interaction.channel.send({ embeds: [ticketEmbed], components: [ticketRow] });
+            await interaction.reply({ content: '✅ تم إرسال لوحة التذاكر بنجاح!', ephemeral: true });
+        }
+
+        else if (commandName === 'bots-status') {
+            await interaction.deferReply();
+            await interaction.guild.members.fetch();
+            const bots = interaction.guild.members.cache.filter(member => member.user.bot);
+
+            let statusText = `🤖 **حالة اتصال البوتات في ${interaction.guild.name}:**\n\n`;
+            bots.forEach(bot => {
+                const status = bot.presence?.status;
+                let statusEmoji = '🟢', statusName = 'متصل';
+                if (!status || status === 'offline') {
+                    statusEmoji = '🔴';
+                    statusName = 'غير متصل';
+                }
+                statusText += `${statusEmoji} **${bot.user.username}** — *${statusName}* (ID: \`${bot.id}\`)\n`;
+            });
+
+            const statusEmbed = new EmbedBuilder()
+                .setTitle('📡 لوحة المراقبة وواقعية الاتصال')
+                .setDescription(statusText)
+                .setColor(0x00AE86)
+                .setTimestamp()
+                .setFooter({ text: 'EM7', iconURL: client.user.displayAvatarURL() });
+
+            await interaction.editReply({ embeds: [statusEmbed] });
+        }
+
+        else if (commandName === 'server-info') {
+            const guild = interaction.guild;
+            const owner = await guild.fetchOwner();
+            const serverEmbed = new EmbedBuilder()
+                .setTitle(`📊 معلومات سيرفر: ${guild.name}`)
+                .setThumbnail(guild.iconURL({ dynamic: true }))
+                .setColor(0xF1C40F)
+                .addFields(
+                    { name: '👑 صاحب السيرفر', value: `<@${owner.id}>`, inline: true },
+                    { name: '👥 عدد الأعضاء', value: `${guild.memberCount} عضو`, inline: true },
+                    { name: '🔒 الرتب', value: `${guild.roles.cache.size} رتبة`, inline: true },
+                    { name: '📁 الرومات', value: `${guild.channels.cache.size} روم`, inline: true },
+                    { name: '📅 تاريخ الإنشاء', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: false }
+                )
+                .setTimestamp()
+                .setFooter({ text: 'EM7', iconURL: client.user.displayAvatarURL() });
+
+            await interaction.reply({ embeds: [serverEmbed] });
+        }
+    }
+
+    // 2. التعامل مع الأزرار (Buttons)
+    else if (interaction.isButton()) {
+        const customId = interaction.customId;
+
+        // أزرار لوحة الإرسال
+        if (customId === 'btn_send_channel') {
+            const modal = new ModalBuilder()
+                .setCustomId('modal_send_channel')
+                .setTitle('إرسال رسالة إلى روم معين');
+
+            const channelIdInput = new TextInputBuilder()
+                .setCustomId('channel_id')
+                .setLabel('أدخل آي دي الروم (Channel ID)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
+
+            const messageInput = new TextInputBuilder()
+                .setCustomId('message_text')
+                .setLabel('محتوى الرسالة (Embed)')
+                .setStyle(TextInputStyle.Paragraph)
+                .setRequired(true);
+
+            modal.addComponents(new ActionRowBuilder().addComponents(channelIdInput), new ActionRowBuilder().addComponents(messageInput));
+            return interaction.showModal(modal);
+        }
+
+        else if (customId === 'btn_send_dm') {
+            const modal = new ModalBuilder()
+                .setCustomId('modal_send_dm')
+                .setTitle('إرسال رسالة خاصة (DM)');
+
+            const userIdInput = new TextInputBuilder()
+                .setCustomId('user_id')
+                .setLabel('أدخل آي دي العضو (User ID)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
+
+            const messageInput = new TextInputBuilder()
+                .setCustomId('message_text')
+                .setLabel('محتوى الرسالة الخاصة')
+                .setStyle(TextInputStyle.Paragraph)
+                .setRequired(true);
+
+            modal.addComponents(new ActionRowBuilder().addComponents(userIdInput), new ActionRowBuilder().addComponents(messageInput));
+            return interaction.showModal(modal);
+        }
+
+        // نظام التذاكر المطور
+        else if (customId === 'create_ticket') {
             const guild = interaction.guild;
             const user = interaction.user;
 
-            // منع فتح أكثر من تذكرة لنفس الشخص (اختياري، أو إنشاء روم جديد مباشرة)
             try {
                 const ticketChannel = await guild.channels.create({
                     name: `ticket-${user.username}`,
                     type: ChannelType.GuildText,
                     permissionOverwrites: [
-                        {
-                            id: guild.id,
-                            deny: [PermissionFlagsBits.ViewChannel],
-                        },
-                        {
-                            id: user.id,
-                            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory],
-                        },
-                        {
-                            id: client.user.id,
-                            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels],
-                        }
+                        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+                        { id: user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+                        { id: client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] }
                     ],
                 });
 
                 const ticketEmbed = new EmbedBuilder()
-                    .setTitle('🎫 تذكرة جديدة')
-                    .setDescription(`أهلاً بك **${user.username}**!\nفضلاً ارحِط مشكلتك أو طلبك، وسيتم الرد عليك من قبل الإدارة قريباً.`)
+                    .setTitle(`🎫 تذكرة العضو: ${user.username}`)
+                    .setDescription(`أهلاً بك **${user.username}**!\nفضلاً اشرح مشكلتك أو طلبك، وسيتم الرد عليك قريباً من قبل الإدارة.\n\n*الرجاء استخدام الأزرار أدناه للتحكم بالتذكرة.*`)
                     .setColor(0x5865F2)
                     .setTimestamp()
-                    .setFooter({ text: 'EM7 Tickets', iconURL: client.user.displayAvatarURL() });
+                    .setFooter({ text: 'EM7 Advanced Tickets', iconURL: client.user.displayAvatarURL() });
 
-                const closeRow = new ActionRowBuilder().addComponents(
+                const ticketControls = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('claim_ticket')
+                        .setLabel('🙋‍♂️ استلام التذكرة')
+                        .setStyle(ButtonStyle.Primary),
                     new ButtonBuilder()
                         .setCustomId('close_ticket')
                         .setLabel('🔒 إغلاق التذكرة')
                         .setStyle(ButtonStyle.Danger)
                 );
 
-                await ticketChannel.send({ content: `<@${user.id}>`, embeds: [ticketEmbed], components: [closeRow] });
+                await ticketChannel.send({ content: `<@${user.id}>`, embeds: [ticketEmbed], components: [ticketControls] });
                 return interaction.reply({ content: `✅ تم فتح تذكرتك بنجاح: ${ticketChannel}`, ephemeral: true });
 
             } catch (err) {
                 console.error(err);
-                return interaction.reply({ content: '❌ حدث خطأ أثناء إنشاء التذكرة، تأكد من صلاحيات البوت.', ephemeral: true });
+                return interaction.reply({ content: '❌ حدث خطأ، تأكد من صلاحيات البوت.', ephemeral: true });
             }
         }
 
-        else if (interaction.customId === 'close_ticket') {
-            await interaction.reply({ content: '🔒 جاري إغلاق وحذف التذكرة خلال 5 ثواني...', ephemeral: true });
+        else if (customId === 'claim_ticket') {
+            const staff = interaction.user;
+            const embed = EmbedBuilder.from(interaction.message.embeds[0])
+                .addFields({ name: '🛠️ تم استلام التذكرة بواسطة', value: `<@${staff.id}>`, inline: false });
+            
+            await interaction.update({ embeds: [embed] });
+            await interaction.followUp({ content: `✅ قام الإداري <@${staff.id}> باستلام هذه التذكرة.` });
+        }
+
+        else if (customId === 'close_ticket') {
+            await interaction.reply({ content: '🔒 جاري إغلاق التذكرة وحذفها خلال 5 ثواني...', ephemeral: true });
             setTimeout(() => {
                 interaction.channel.delete().catch(() => {});
             }, 5000);
         }
-        return;
     }
 
-    if (!interaction.isChatInputCommand()) return;
+    // 3. التعامل مع النماذج (Modals) لإدخال الرسائل
+    else if (interaction.isModalSubmit()) {
+        if (interaction.customId === 'modal_send_channel') {
+            const channelId = interaction.fields.getTextInputValue('channel_id');
+            const messageText = interaction.fields.getTextInputValue('message_text');
 
-    const { commandName } = interaction;
-
-    if (commandName === 'ping') {
-        const latency = Date.now() - interaction.createdTimestamp;
-        await interaction.reply(`🏓 Pong! سرعة الاستجابة: **${Math.abs(latency)}ms**`);
-    }
-
-    // أمر إرسال لوحة التذاكر في الروم
-    else if (commandName === 'setup-ticket') {
-        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-            return interaction.reply({ content: '❌ عذراً، هذا الأمر مخصص للإدارة فقط!', ephemeral: true });
-        }
-
-        const ticketEmbed = new EmbedBuilder()
-            .setTitle('🎫 نظام الدعم الفني وتذاكر السيرفر')
-            .setDescription('إذا تواجهك أي مشكلة، استفسار، أو تريد التواصل مع الإدارة:\n\n**اضغط على الزر بالأسفل لفتح تذكرة خاصة بك!**')
-            .setColor(0xF1C40F)
-            .setTimestamp()
-            .setFooter({ text: 'EM7 Security & Support', iconURL: client.user.displayAvatarURL() });
-
-        const ticketRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('create_ticket')
-                .setLabel('🎫 فتح تذكرة جديدة')
-                .setStyle(ButtonStyle.Primary)
-        );
-
-        await interaction.channel.send({ embeds: [ticketEmbed], components: [ticketRow] });
-        await interaction.reply({ content: '✅ تم إنشاء لوحة التذاكر في هذا الروم بنجاح!', ephemeral: true });
-    }
-
-    // فحص حالة البوتات بواقعية
-    else if (commandName === 'bots-status') {
-        await interaction.deferReply();
-        
-        await interaction.guild.members.fetch();
-        const bots = interaction.guild.members.cache.filter(member => member.user.bot);
-
-        let statusText = `🤖 **حالة اتصال البوتات في ${interaction.guild.name}:**\n\n`;
-        
-        bots.forEach(bot => {
-            const status = bot.presence?.status;
-            let statusEmoji = '🟢';
-            let statusName = 'متصل';
-
-            if (!status || status === 'offline') {
-                statusEmoji = '🔴';
-                statusName = 'غير متصل';
+            const targetChannel = interaction.guild.channels.cache.get(channelId);
+            if (!targetChannel) {
+                return interaction.reply({ content: '❌ آي دي الروم غير صحيح أو أن البوت لا يراه!', ephemeral: true });
             }
 
-            statusText += `${statusEmoji} **${bot.user.username}** — *${statusName}* (ID: \`${bot.id}\`)\n`;
-        });
+            const embed = new EmbedBuilder()
+                .setDescription(messageText)
+                .setColor(0x5865F2)
+                .setTimestamp()
+                .setFooter({ text: 'EM7', iconURL: client.user.displayAvatarURL() });
 
-        const statusEmbed = new EmbedBuilder()
-            .setTitle('📡 لوحة المراقبة وواقعية الاتصال')
-            .setDescription(statusText)
-            .setColor(0x00AE86)
-            .setTimestamp()
-            .setFooter({ text: 'EM7', iconURL: client.user.displayAvatarURL() });
-
-        await interaction.editReply({ embeds: [statusEmbed] });
-    }
-
-    else if (commandName === 'server-info') {
-        const guild = interaction.guild;
-        const owner = await guild.fetchOwner();
-
-        const serverEmbed = new EmbedBuilder()
-            .setTitle(`📊 معلومات سيرفر: ${guild.name}`)
-            .setThumbnail(guild.iconURL({ dynamic: true }))
-            .setColor(0xF1C40F)
-            .addFields(
-                { name: '👑 صاحب السيرفر', value: `<@${owner.id}>`, inline: true },
-                { name: '👥 عدد الأعضاء', value: `${guild.memberCount} عضو`, inline: true },
-                { name: '🔒 الرتب', value: `${guild.roles.cache.size} رتبة`, inline: true },
-                { name: '📁 الرومات', value: `${guild.channels.cache.size} روم`, inline: true },
-                { name: '📅 تاريخ الإنشاء', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: false }
-            )
-            .setTimestamp()
-            .setFooter({ text: 'EM7', iconURL: client.user.displayAvatarURL() });
-
-        await interaction.reply({ embeds: [serverEmbed] });
-    }
-
-    else if (commandName === 'say') {
-        const targetType = interaction.options.getString('target');
-        const textMessage = interaction.options.getString('message');
-        const userMention = interaction.options.getUser('user');
-        const userIdInput = interaction.options.getString('user_id');
-        const embedTitle = interaction.options.getString('title');
-        const imageUrl = interaction.options.getString('image_url');
-        const shouldAddButton = interaction.options.getBoolean('add_button');
-
-        const embed = new EmbedBuilder()
-            .setDescription(textMessage)
-            .setColor(0x5865F2)
-            .setTimestamp()
-            .setFooter({ text: 'EM7', iconURL: client.user.displayAvatarURL() });
-
-        if (embedTitle) embed.setTitle(embedTitle);
-        if (imageUrl) embed.setImage(imageUrl);
-
-        let componentsArray = [];
-        if (shouldAddButton) {
             const inviteButton = new ButtonBuilder()
                 .setStyle(ButtonStyle.Link)
                 .setLabel('🔗 انضم إلى السيرفر')
                 .setURL('https://discord.gg/qqKG4W6WK');
-
             const row = new ActionRowBuilder().addComponents(inviteButton);
-            componentsArray.push(row);
+
+            await targetChannel.send({ embeds: [embed], components: [row] });
+            return interaction.reply({ content: `✅ تم إرسال الـ Embed بنجاح إلى الروم <#${channelId}>!`, ephemeral: true });
         }
 
-        let targetUser = null;
-        if (userMention) {
-            targetUser = userMention;
-        } else if (userIdInput) {
+        else if (interaction.customId === 'modal_send_dm') {
+            const userId = interaction.fields.getTextInputValue('user_id');
+            const messageText = interaction.fields.getTextInputValue('message_text');
+
             try {
-                targetUser = await client.users.fetch(userIdInput);
+                const targetUser = await client.users.fetch(userId);
+                const embed = new EmbedBuilder()
+                    .setDescription(messageText)
+                    .setColor(0x5865F2)
+                    .setTimestamp()
+                    .setFooter({ text: 'EM7', iconURL: client.user.displayAvatarURL() });
+
+                const inviteButton = new ButtonBuilder()
+                    .setStyle(ButtonStyle.Link)
+                    .setLabel('🔗 انضم إلى السيرفر')
+                    .setURL('https://discord.gg/qqKG4W6WK');
+                const row = new ActionRowBuilder().addComponents(inviteButton);
+
+                await targetUser.send({ embeds: [embed], components: [row] });
+                return interaction.reply({ content: `✅ تم إرسال الرسالة الخاصة بنجاح لـ **${targetUser.tag}**!`, ephemeral: true });
             } catch (err) {
-                return interaction.reply({ content: '❌ الـ ID غير صحيح أو أن البوت لا يراه!', ephemeral: true });
+                return interaction.reply({ content: '❌ الآي دي غير صحيح أو أن الشخص مقفل رسائل الخاص (DM)!', ephemeral: true });
             }
-        }
-
-        try {
-            if (targetType === 'dm') {
-                if (!targetUser) {
-                    return interaction.reply({ content: '❌ يجب تحديد مستخدم لإرسال الرسالة في الخاص!', ephemeral: true });
-                }
-
-                await targetUser.send({ embeds: [embed], components: componentsArray });
-                await interaction.reply({ content: `✅ تم إرسال الـ Embed مع زر السيرفر بالخاص لـ **${targetUser.tag}**!`, ephemeral: true });
-
-            } else {
-                let finalContent = targetUser ? `<@${targetUser.id}>` : '';
-
-                await interaction.reply({ content: '✅ جاري إرسال الرسالة...', ephemeral: true });
-                await interaction.channel.send({
-                    content: finalContent,
-                    embeds: [embed],
-                    components: componentsArray
-                });
-            }
-        } catch (error) {
-            console.error(error);
-            await interaction.followUp({ content: '❌ حدث خطأ، تأكد من فتح الخاص أو صلاحيات البوت.', ephemeral: true });
         }
     }
 });
