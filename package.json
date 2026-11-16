@@ -1,13 +1,14 @@
 {
-  "name": "em7-ultimate",
+  "name": "em7-ultimate-v3",
   "version": "3.0.0",
-  "description": "EM7 Ultimate Discord Administration AI",
+  "private": true,
+  "description": "EM7 private Discord control bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.18.0"
   },
   "dependencies": {
     "discord.js": "^14.19.3"
