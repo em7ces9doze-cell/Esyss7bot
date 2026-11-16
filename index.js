@@ -13,10 +13,20 @@ const client = new Client({
 
 const TOKEN = process.env.DISCORD_TOKEN || process.env.TOKEN;
 
+// الرتب المسموح لها استخدام الأوامر الإدارية والبوت
+const ALLOWED_ROLES = ['1570880065426952303', '1570873121056227329'];
+
+function hasAdminPermission(member) {
+    if (!member) return false;
+    // إذا كان صاحب السيرفر أو معه إحدى الرتب المحددة
+    if (member.permissions.has(PermissionFlagsBits.Administrator)) return true;
+    return member.roles.cache.some(role => ALLOWED_ROLES.includes(role.id));
+}
+
 const commands = [
     new SlashCommandBuilder()
         .setName('ping')
-        .setDescription('يعرض سرعة استجابة البوت (البينج)'),
+        .setDescription('يعرض سرعة استجابة البوت بدقة فائقة'),
     
     new SlashCommandBuilder()
         .setName('bots-status')
@@ -24,15 +34,15 @@ const commands = [
 
     new SlashCommandBuilder()
         .setName('server-info')
-        .setDescription('عرض معلومات تفصيلية عن السيرفر الحالي'),
+        .setDescription('عرض معلومات تفصيلية واحترافية عن السيرفر الحالي'),
 
     new SlashCommandBuilder()
         .setName('setup-ticket')
-        .setDescription('إرسال لوحة التذاكر الاحترافية في الروم الحالي'),
+        .setDescription('إرسال لوحة التذاكر المطور في الروم الحالي (للإدارة فقط)'),
 
     new SlashCommandBuilder()
         .setName('send')
-        .setDescription('لوحة إرسال الرسائل المتقدمة (لروم معين أو رسالة خاصة عبر أزرار)'),
+        .setDescription('لوحة إرسال الرسائل المتقدمة (لروم معين أو رسالة خاصة مع حفظها بروم سري)'),
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -51,7 +61,7 @@ client.once('ready', async () => {
     }
 });
 
-// حماية الروابط
+// حماية الروابط والسبام
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
@@ -64,29 +74,36 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// التعامل مع الأوامر والأزرار والمودالات
+// التعامل مع التفاعلات والأوامر
 client.on('interactionCreate', async interaction => {
     
-    // 1. التعامل مع الأوامر الأساسية (Slash Commands)
+    // 1. الأوامر (Slash Commands)
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
 
         if (commandName === 'ping') {
             const latency = Date.now() - interaction.createdTimestamp;
-            await interaction.reply(`🏓 Pong! سرعة الاستجابة: **${Math.abs(latency)}ms**`);
+            const pingEmbed = new EmbedBuilder()
+                .setTitle('🏓 سرعة استجابة النظام')
+                .setDescription(`البينج الحالي للبوت: **${Math.abs(latency)}ms** ⚡`)
+                .setColor(0x00FF99)
+                .setTimestamp()
+                .setFooter({ text: 'EM7 Network', iconURL: client.user.displayAvatarURL() });
+
+            await interaction.reply({ embeds: [pingEmbed], ephemeral: true });
         }
 
         else if (commandName === 'send') {
-            if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-                return interaction.reply({ content: '❌ هذا الأمر مخصص للإدارة فقط!', ephemeral: true });
+            if (!hasAdminPermission(interaction.member)) {
+                return interaction.reply({ content: '❌ عذراً، هذا الأمر مخصص لأصحاب الرتب الإدارية المحددة فقط!', ephemeral: true });
             }
 
             const panelEmbed = new EmbedBuilder()
-                .setTitle('📤 لوحة إرسال الرسائل الاحترافية')
-                .setDescription('اختر الطريقة المناسبة لإرسال رسالتك عبر الأزرار أدناه:\n\n🔹 **إرسال روم**: لإرسال رسالة Embed لروم معين عبر الآي دي.\n🔹 **رسالة خاصة (DM)**: لإرسال رسالة خاصة لعضو عبر الآي دي الخاص به.')
+                .setTitle('📤 لوحة تحكم الإرسال والرسائل الذكية')
+                .setDescription('اختر الطريقة المناسبة لإرسال رسالتك الاحترافية عبر الأزرار أدناه:\n\n🔹 **إرسال روم**: لإرسال رسالة Embed فخمة لروم محدد عبر الآي دي.\n🔹 **رسالة خاصة (DM)**: لإرسال رسالة خاصة لعضو مع توثيقها تلقائياً في روم **(رسائل-سرية)**.')
                 .setColor(0x5865F2)
                 .setTimestamp()
-                .setFooter({ text: 'EM7 Panel System', iconURL: client.user.displayAvatarURL() });
+                .setFooter({ text: 'EM7 Dispatcher', iconURL: client.user.displayAvatarURL() });
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
@@ -95,7 +112,7 @@ client.on('interactionCreate', async interaction => {
                     .setStyle(ButtonStyle.Primary),
                 new ButtonBuilder()
                     .setCustomId('btn_send_dm')
-                    .setLabel('✉️ رسالة خاصة')
+                    .setLabel('✉️ رسالة خاصة (سري)')
                     .setStyle(ButtonStyle.Secondary)
             );
 
@@ -103,16 +120,16 @@ client.on('interactionCreate', async interaction => {
         }
 
         else if (commandName === 'setup-ticket') {
-            if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-                return interaction.reply({ content: '❌ عذراً، هذا الأمر للإدارة فقط!', ephemeral: true });
+            if (!hasAdminPermission(interaction.member)) {
+                return interaction.reply({ content: '❌ عذراً، هذا الأمر مخصص للإدارة المعتمدة فقط!', ephemeral: true });
             }
 
             const ticketEmbed = new EmbedBuilder()
-                .setTitle('🎫 نظام الدعم الفني والتذاكر')
-                .setDescription('إذا كان لديك أي استفسار، مشكلة، أو تريد التواصل مع الإدارة:\n\n**اضغط على الزر أدناه لفتح تذكرة خاصة بك.**')
+                .setTitle('🎫 نظام الدعم الفني والتذاكر الاحترافي')
+                .setDescription('إذا كان لديك أي استفسار، مشكلة، أو تريد التواصل مع الإدارة بشكل سري:\n\n**اضغط على الزر أدناه لفتح تذكرة خاصة بك فوراً.**')
                 .setColor(0xF1C40F)
                 .setTimestamp()
-                .setFooter({ text: 'EM7 Support System', iconURL: client.user.displayAvatarURL() });
+                .setFooter({ text: 'EM7 Support Security', iconURL: client.user.displayAvatarURL() });
 
             const ticketRow = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
@@ -122,7 +139,7 @@ client.on('interactionCreate', async interaction => {
             );
 
             await interaction.channel.send({ embeds: [ticketEmbed], components: [ticketRow] });
-            await interaction.reply({ content: '✅ تم إرسال لوحة التذاكر بنجاح!', ephemeral: true });
+            await interaction.reply({ content: '✅ تم إنشاء لوحة التذاكر الفخمة بنجاح!', ephemeral: true });
         }
 
         else if (commandName === 'bots-status') {
@@ -142,11 +159,11 @@ client.on('interactionCreate', async interaction => {
             });
 
             const statusEmbed = new EmbedBuilder()
-                .setTitle('📡 لوحة المراقبة وواقعية الاتصال')
+                .setTitle('📡 لوحة مراقبة البوتات والواقعية')
                 .setDescription(statusText)
                 .setColor(0x00AE86)
                 .setTimestamp()
-                .setFooter({ text: 'EM7', iconURL: client.user.displayAvatarURL() });
+                .setFooter({ text: 'EM7 Monitoring', iconURL: client.user.displayAvatarURL() });
 
             await interaction.editReply({ embeds: [statusEmbed] });
         }
@@ -155,42 +172,41 @@ client.on('interactionCreate', async interaction => {
             const guild = interaction.guild;
             const owner = await guild.fetchOwner();
             const serverEmbed = new EmbedBuilder()
-                .setTitle(`📊 معلومات سيرفر: ${guild.name}`)
+                .setTitle(`📊 تقرير سيرفر: ${guild.name}`)
                 .setThumbnail(guild.iconURL({ dynamic: true }))
                 .setColor(0xF1C40F)
                 .addFields(
-                    { name: '👑 صاحب السيرفر', value: `<@${owner.id}>`, inline: true },
-                    { name: '👥 عدد الأعضاء', value: `${guild.memberCount} عضو`, inline: true },
-                    { name: '🔒 الرتب', value: `${guild.roles.cache.size} رتبة`, inline: true },
-                    { name: '📁 الرومات', value: `${guild.channels.cache.size} روم`, inline: true },
-                    { name: '📅 تاريخ الإنشاء', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: false }
+                    { name: '👑 مالك السيرفر', value: `<@${owner.id}>`, inline: true },
+                    { name: '👥 إجمالي الأعضاء', value: `${guild.memberCount} عضو`, inline: true },
+                    { name: '🔒 الرتب المتاحة', value: `${guild.roles.cache.size} رتبة`, inline: true },
+                    { name: '📁 الرومات الإجمالية', value: `${guild.channels.cache.size} روم`, inline: true },
+                    { name: '📅 تاريخ التأسيس', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: false }
                 )
                 .setTimestamp()
-                .setFooter({ text: 'EM7', iconURL: client.user.displayAvatarURL() });
+                .setFooter({ text: 'EM7 Analytics', iconURL: client.user.displayAvatarURL() });
 
             await interaction.reply({ embeds: [serverEmbed] });
         }
     }
 
-    // 2. التعامل مع الأزرار (Buttons)
+    // 2. الأزرار (Buttons)
     else if (interaction.isButton()) {
         const customId = interaction.customId;
 
-        // أزرار لوحة الإرسال
         if (customId === 'btn_send_channel') {
             const modal = new ModalBuilder()
                 .setCustomId('modal_send_channel')
-                .setTitle('إرسال رسالة إلى روم معين');
+                .setTitle('إرسال رسالة احترافية لروم');
 
             const channelIdInput = new TextInputBuilder()
                 .setCustomId('channel_id')
-                .setLabel('أدخل آي دي الروم (Channel ID)')
+                .setLabel('آي دي الروم المستهدف (Channel ID)')
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 
             const messageInput = new TextInputBuilder()
                 .setCustomId('message_text')
-                .setLabel('محتوى الرسالة (Embed)')
+                .setLabel('محتوى رسالة الـ Embed')
                 .setStyle(TextInputStyle.Paragraph)
                 .setRequired(true);
 
@@ -201,11 +217,11 @@ client.on('interactionCreate', async interaction => {
         else if (customId === 'btn_send_dm') {
             const modal = new ModalBuilder()
                 .setCustomId('modal_send_dm')
-                .setTitle('إرسال رسالة خاصة (DM)');
+                .setTitle('إرسال رسالة خاصة وحفظها بسرية');
 
             const userIdInput = new TextInputBuilder()
                 .setCustomId('user_id')
-                .setLabel('أدخل آي دي العضو (User ID)')
+                .setLabel('آي دي العضو المستهدف (User ID)')
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 
@@ -219,7 +235,6 @@ client.on('interactionCreate', async interaction => {
             return interaction.showModal(modal);
         }
 
-        // نظام التذاكر المطور
         else if (customId === 'create_ticket') {
             const guild = interaction.guild;
             const user = interaction.user;
@@ -237,10 +252,10 @@ client.on('interactionCreate', async interaction => {
 
                 const ticketEmbed = new EmbedBuilder()
                     .setTitle(`🎫 تذكرة العضو: ${user.username}`)
-                    .setDescription(`أهلاً بك **${user.username}**!\nفضلاً اشرح مشكلتك أو طلبك، وسيتم الرد عليك قريباً من قبل الإدارة.\n\n*الرجاء استخدام الأزرار أدناه للتحكم بالتذكرة.*`)
+                    .setDescription(`أهلاً بك **${user.username}**!\nفضلاً اشرح مشكلتك بالتفصيل، وسيتم الرد عليك من قبل فريق الإدارة قريباً.\n\n*استخدم الأزرار أدناه للتحكم بمسار التذكرة.*`)
                     .setColor(0x5865F2)
                     .setTimestamp()
-                    .setFooter({ text: 'EM7 Advanced Tickets', iconURL: client.user.displayAvatarURL() });
+                    .setFooter({ text: 'EM7 Tickets Control', iconURL: client.user.displayAvatarURL() });
 
                 const ticketControls = new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
@@ -254,32 +269,32 @@ client.on('interactionCreate', async interaction => {
                 );
 
                 await ticketChannel.send({ content: `<@${user.id}>`, embeds: [ticketEmbed], components: [ticketControls] });
-                return interaction.reply({ content: `✅ تم فتح تذكرتك بنجاح: ${ticketChannel}`, ephemeral: true });
+                return interaction.reply({ content: `✅ تم فتح تذكرتك الخاصة بنجاح: ${ticketChannel}`, ephemeral: true });
 
             } catch (err) {
                 console.error(err);
-                return interaction.reply({ content: '❌ حدث خطأ، تأكد من صلاحيات البوت.', ephemeral: true });
+                return interaction.reply({ content: '❌ حدث خطأ، تأكد من صلاحيات البوت الإدارية.', ephemeral: true });
             }
         }
 
         else if (customId === 'claim_ticket') {
             const staff = interaction.user;
             const embed = EmbedBuilder.from(interaction.message.embeds[0])
-                .addFields({ name: '🛠️ تم استلام التذكرة بواسطة', value: `<@${staff.id}>`, inline: false });
+                .addFields({ name: '🛠️ تم استلام التذكرة بواسطة المشرف', value: `<@${staff.id}>`, inline: false });
             
             await interaction.update({ embeds: [embed] });
-            await interaction.followUp({ content: `✅ قام الإداري <@${staff.id}> باستلام هذه التذكرة.` });
+            await interaction.followUp({ content: `✅ قام الإداري <@${staff.id}> باستلام هذه التذكرة لمتابعتها.` });
         }
 
         else if (customId === 'close_ticket') {
-            await interaction.reply({ content: '🔒 جاري إغلاق التذكرة وحذفها خلال 5 ثواني...', ephemeral: true });
+            await interaction.reply({ content: '🔒 جاري إغلاق التذكرة وحذف الروم خلال 5 ثواني...', ephemeral: true });
             setTimeout(() => {
                 interaction.channel.delete().catch(() => {});
             }, 5000);
         }
     }
 
-    // 3. التعامل مع النماذج (Modals) لإدخال الرسائل
+    // 3. النماذج (Modals)
     else if (interaction.isModalSubmit()) {
         if (interaction.customId === 'modal_send_channel') {
             const channelId = interaction.fields.getTextInputValue('channel_id');
@@ -287,14 +302,14 @@ client.on('interactionCreate', async interaction => {
 
             const targetChannel = interaction.guild.channels.cache.get(channelId);
             if (!targetChannel) {
-                return interaction.reply({ content: '❌ آي دي الروم غير صحيح أو أن البوت لا يراه!', ephemeral: true });
+                return interaction.reply({ content: '❌ آي دي الروم غير صحيح أو غير مرئي للبوت!', ephemeral: true });
             }
 
             const embed = new EmbedBuilder()
                 .setDescription(messageText)
                 .setColor(0x5865F2)
                 .setTimestamp()
-                .setFooter({ text: 'EM7', iconURL: client.user.displayAvatarURL() });
+                .setFooter({ text: 'EM7 Official', iconURL: client.user.displayAvatarURL() });
 
             const inviteButton = new ButtonBuilder()
                 .setStyle(ButtonStyle.Link)
@@ -303,7 +318,7 @@ client.on('interactionCreate', async interaction => {
             const row = new ActionRowBuilder().addComponents(inviteButton);
 
             await targetChannel.send({ embeds: [embed], components: [row] });
-            return interaction.reply({ content: `✅ تم إرسال الـ Embed بنجاح إلى الروم <#${channelId}>!`, ephemeral: true });
+            return interaction.reply({ content: `✅ تم إرسال الـ Embed بنجاح للروم <#${channelId}>!`, ephemeral: true });
         }
 
         else if (interaction.customId === 'modal_send_dm') {
@@ -313,10 +328,11 @@ client.on('interactionCreate', async interaction => {
             try {
                 const targetUser = await client.users.fetch(userId);
                 const embed = new EmbedBuilder()
+                    .setTitle('📩 رسالة خاصة إدارية')
                     .setDescription(messageText)
-                    .setColor(0x5865F2)
+                    .setColor(0x9B59B6)
                     .setTimestamp()
-                    .setFooter({ text: 'EM7', iconURL: client.user.displayAvatarURL() });
+                    .setFooter({ text: 'EM7 Secure DM', iconURL: client.user.displayAvatarURL() });
 
                 const inviteButton = new ButtonBuilder()
                     .setStyle(ButtonStyle.Link)
@@ -324,10 +340,38 @@ client.on('interactionCreate', async interaction => {
                     .setURL('https://discord.gg/qqKG4W6WK');
                 const row = new ActionRowBuilder().addComponents(inviteButton);
 
+                // إرسال الرسالة الخاصة للعضو
                 await targetUser.send({ embeds: [embed], components: [row] });
-                return interaction.reply({ content: `✅ تم إرسال الرسالة الخاصة بنجاح لـ **${targetUser.tag}**!`, ephemeral: true });
+
+                // البحث عن روم "رسائل-سرية" أو إنشائه تلقائياً في السيرفر
+                let secretChannel = interaction.guild.channels.cache.find(ch => ch.name === 'رسائل-سرية');
+                if (!secretChannel) {
+                    secretChannel = await interaction.guild.channels.create({
+                        name: 'رسائل-سرية',
+                        type: ChannelType.GuildText,
+                        permissionOverwrites: [
+                            { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] }, // مخفي عن الأعضاء العاديين
+                            { id: client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
+                        ]
+                    }).catch(() => {});
+                }
+
+                // إذا وُجد الروم، يتم توثيق وحفظ نسخة من الإمبد والرسالة فيه
+                if (secretChannel) {
+                    const logEmbed = new EmbedBuilder()
+                        .setTitle('🔒 أرشيف رسالة خاصة مرسلة')
+                        .setDescription(`**المُرسِل الإداري:** <@${interaction.user.id}>\n**المستهدف:** <@${targetUser.id}> (\`${targetUser.id}\`)\n\n**محتوى الرسالة:**\n${messageText}`)
+                        .setColor(0xE74C3C)
+                        .setTimestamp()
+                        .setFooter({ text: 'EM7 Secret Archive', iconURL: client.user.displayAvatarURL() });
+
+                    await secretChannel.send({ embeds: [logEmbed] }).catch(() => {});
+                }
+
+                return interaction.reply({ content: `✅ تم إرسال الرسالة الخاصة بنجاح لـ **${targetUser.tag}** وتوثيقها في روم **رسائل-سرية**!`, ephemeral: true });
             } catch (err) {
-                return interaction.reply({ content: '❌ الآي دي غير صحيح أو أن الشخص مقفل رسائل الخاص (DM)!', ephemeral: true });
+                console.error(err);
+                return interaction.reply({ content: '❌ الآي دي المدخل غير صحيح، أو أن العضو مقفل رسائل الخاص (DM)!', ephemeral: true });
             }
         }
     }
