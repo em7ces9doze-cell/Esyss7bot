@@ -12,18 +12,18 @@ const client = new Client({
 
 const TOKEN = process.env.DISCORD_TOKEN || process.env.TOKEN;
 
-// تعريف الأوامر المطورة
+// تعريف الأوامر
 const commands = [
     new SlashCommandBuilder()
         .setName('ping')
         .setDescription('يعرض سرعة استجابة البوت (البينج)'),
     
-    newSlashCommand = new SlashCommandBuilder()
+    new SlashCommandBuilder()
         .setName('say')
         .setDescription('نظام إرسال رسائل احترافي (Embed) للعام أو للخاص مع خيارات متقدمة')
         .addStringOption(option => 
             option.setName('target')
-                .setDescription('مكان الإرسال: الشام الحالي (channel) أو خاص لشخص (dm)')
+                .setDescription('مكان الإرسال: الشات الحالي (channel) أو خاص لشخص (dm)')
                 .setRequired(true)
                 .addChoices(
                     { name: 'الشات الحالي (روم)', value: 'channel' },
@@ -51,8 +51,12 @@ const commands = [
                 .setRequired(false))
         .addStringOption(option => 
             option.setName('link')
-                .setDescription('رابط سيرفر أو موقع لإضافته كزر تفاعلي أو مرجع (اختياري)')
-                .setRequired(false))
+                .setDescription('رابط سيرفر أو موقع لإضافته (اختياري)')
+                .setRequired(false)),
+
+    new SlashCommandBuilder()
+        .setName('bots-status')
+        .setDescription('فحص حالة الاتصال والبينج للبوتات الأخرى في السيرفر')
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -72,7 +76,7 @@ client.once('ready', async () => {
     }
 });
 
-// الردود التلقائية والحماية ضد الروابط الخبيثة أو سبام الديسكورد
+// الردود التلقائية والحماية
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
@@ -97,11 +101,35 @@ client.on('interactionCreate', async interaction => {
 
     if (commandName === 'ping') {
         const latency = Date.now() - interaction.createdTimestamp;
-        await interaction.reply({ content: `🏓 Pong! سرعة الاستجابة: **${Math.abs(latency)}ms**`, ephemeral: true });
+        await interaction.reply(`🏓 Pong! سرعة الاستجابة: **${Math.abs(latency)}ms**`);
+    }
+
+    else if (commandName === 'bots-status') {
+        await interaction.deferReply();
+        
+        // جلب أعضاء السيرفر لمعرفة البوتات الموجودة
+        await interaction.guild.members.fetch();
+        const bots = interaction.guild.members.cache.filter(member => member.user.bot);
+
+        let statusText = `🤖 **حالة البوتات في سيرفر ${interaction.guild.name}:**\n\n`;
+        
+        bots.forEach(bot => {
+            let statusEmoji = '🟢'; // افتراضي متصل
+            statusText += `${statusEmoji} **${bot.user.username}** (ID: \`${bot.id}\`)\n`;
+        });
+
+        const statusEmbed = new EmbedBuilder()
+            .setTitle('📡 لوحة حالة اتصال البوتات')
+            .setDescription(statusText)
+            .setColor(0x00AE86)
+            .setTimestamp()
+            .setFooter({ text: 'EM7', iconURL: client.user.displayAvatarURL() });
+
+        await interaction.editReply({ embeds: [statusEmbed] });
     }
 
     else if (commandName === 'say') {
-        const targetType = interaction.options.getString('target'); // channel أو dm
+        const targetType = interaction.options.getString('target');
         const textMessage = interaction.options.getString('message');
         const userMention = interaction.options.getUser('user');
         const userIdInput = interaction.options.getString('user_id');
@@ -109,18 +137,17 @@ client.on('interactionCreate', async interaction => {
         const imageUrl = interaction.options.getString('image_url');
         const linkUrl = interaction.options.getString('link');
 
-        // بناء الـ Embed الاحترافي
+        // تعديل الـ Footer بحيث يظهر اسم EM7 وصورة البوت فقط بدون اسمك
         const embed = new EmbedBuilder()
             .setDescription(textMessage)
             .setColor(0x5865F2)
             .setTimestamp()
-            .setFooter({ text: `تم الإرسال بواسطة: ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() });
+            .setFooter({ text: 'EM7', iconURL: client.user.displayAvatarURL() });
 
         if (embedTitle) embed.setTitle(embedTitle);
         if (imageUrl) embed.setImage(imageUrl);
         if (linkUrl) embed.setURL(linkUrl);
 
-        // تحديد المستهدف (سواء عبر الـ User Mention أو الـ ID أو الجميع)
         let targetUser = null;
         if (userMention) {
             targetUser = userMention;
@@ -134,7 +161,6 @@ client.on('interactionCreate', async interaction => {
 
         try {
             if (targetType === 'dm') {
-                // إرسال رسالة خاصة للبريد الخاص بالشخص
                 if (!targetUser) {
                     return interaction.reply({ content: '❌ يجب عليك تحديد مستخدم (عبر يوزر أو ID) لإرسال الرسالة في الخاص!', ephemeral: true });
                 }
@@ -145,8 +171,7 @@ client.on('interactionCreate', async interaction => {
                 await interaction.reply({ content: `✅ تم إرسال الـ Embed بنجاح إلى الخاص لـ **${targetUser.tag}**!`, ephemeral: true });
 
             } else {
-                // إرسال في الشات الحالي
-                let finalContent = targetUser ? `<@${targetUser.id}>` : ''; // إذا محدد شخص يسوي له منشن بالروم
+                let finalContent = targetUser ? `<@${targetUser.id}>` : '';
 
                 await interaction.reply({ content: '✅ جاري إرسال الرسالة...', ephemeral: true });
                 await interaction.channel.send({
