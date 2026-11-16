@@ -6,26 +6,53 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.DirectMessages,
     ]
 });
 
 const TOKEN = process.env.DISCORD_TOKEN || process.env.TOKEN;
 
-// تعريف الأوامر
+// تعريف الأوامر المطورة
 const commands = [
     new SlashCommandBuilder()
         .setName('ping')
         .setDescription('يعرض سرعة استجابة البوت (البينج)'),
     
-    new SlashCommandBuilder()
+    newSlashCommand = new SlashCommandBuilder()
         .setName('say')
-        .setDescription('يخلي البوت يكرر كلامك')
+        .setDescription('نظام إرسال رسائل احترافي (Embed) للعام أو للخاص مع خيارات متقدمة')
         .addStringOption(option => 
-            option.setName('message').setDescription('الكلام اللي تبي البوت يقوله').setRequired(true)),
-
-    new SlashCommandBuilder()
-        .setName('game')
-        .setDescription('لعبة سريعة: خمن الرقم من 1 إلى 10!')
+            option.setName('target')
+                .setDescription('مكان الإرسال: الشام الحالي (channel) أو خاص لشخص (dm)')
+                .setRequired(true)
+                .addChoices(
+                    { name: 'الشات الحالي (روم)', value: 'channel' },
+                    { name: 'رسالة خاصة (DM)', value: 'dm' }
+                ))
+        .addStringOption(option => 
+            option.setName('message')
+                .setDescription('نص الرسالة أو محتوى الـ Embed')
+                .setRequired(true))
+        .addUserOption(option => 
+            option.setName('user')
+                .setDescription('استهداف شخص معين (يوزر) إذا اخترت إرسال خاص أو منشن بالشات')
+                .setRequired(false))
+        .addStringOption(option => 
+            option.setName('user_id')
+                .setDescription('أو حدد شخص معين عن طريق الـ ID الخاص به')
+                .setRequired(false))
+        .addStringOption(option => 
+            option.setName('title')
+                .setDescription('عنوان الـ Embed (اختياري)')
+                .setRequired(false))
+        .addStringOption(option => 
+            option.setName('image_url')
+                .setDescription('رابط صورة تبي تحطها في الـ Embed (اختياري)')
+                .setRequired(false))
+        .addStringOption(option => 
+            option.setName('link')
+                .setDescription('رابط سيرفر أو موقع لإضافته كزر تفاعلي أو مرجع (اختياري)')
+                .setRequired(false))
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -35,20 +62,17 @@ client.once('ready', async () => {
 
     try {
         console.log('Started refreshing application (/) commands.');
-
-        // تسجيل الأوامر على مستوى ديسكورد بالكامل (Global)
         await rest.put(
             Routes.applicationCommands(client.user.id),
             { body: commands },
         );
-
         console.log('Successfully reloaded application (/) commands.');
     } catch (error) {
         console.error(error);
     }
 });
 
-// الردود التلقائية والحماية
+// الردود التلقائية والحماية ضد الروابط الخبيثة أو سبام الديسكورد
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
@@ -63,10 +87,6 @@ client.on('messageCreate', async (message) => {
     if (message.content === 'السلام عليكم' || message.content === 'السلام') {
         message.reply('وعليكم السلام ورحمة الله وبركاته! نورت سيرفرنا 🤍');
     }
-    
-    if (message.content === 'ايش وضع البوت؟' || message.content === 'من انت؟') {
-        message.reply('أنا **Emsys7**، بوت السيستم الخاص فيك وجاهز لخدمة السيرفر! 🚀');
-    }
 });
 
 // التفاعل مع الأوامر
@@ -77,41 +97,67 @@ client.on('interactionCreate', async interaction => {
 
     if (commandName === 'ping') {
         const latency = Date.now() - interaction.createdTimestamp;
-        await interaction.reply(`🏓 Pong! سرعة الاستجابة: **${Math.abs(latency)}ms**`);
+        await interaction.reply({ content: `🏓 Pong! سرعة الاستجابة: **${Math.abs(latency)}ms**`, ephemeral: true });
     }
 
     else if (commandName === 'say') {
-        const text = interaction.options.getString('message');
-        await interaction.reply({ content: 'تم إرسال رسالتك بنجاح ✅', ephemeral: true });
-        await interaction.channel.send(text);
-    }
+        const targetType = interaction.options.getString('target'); // channel أو dm
+        const textMessage = interaction.options.getString('message');
+        const userMention = interaction.options.getUser('user');
+        const userIdInput = interaction.options.getString('user_id');
+        const embedTitle = interaction.options.getString('title');
+        const imageUrl = interaction.options.getString('image_url');
+        const linkUrl = interaction.options.getString('link');
 
-    else if (commandName === 'game') {
-        const secretNumber = Math.floor(Math.random() * 10) + 1;
-        
+        // بناء الـ Embed الاحترافي
         const embed = new EmbedBuilder()
-            .setTitle('🎮 لعبة تخمين الرقم - Emsys7')
-            .setDescription('اخترت رقم عشوائي بين **1 و 10**.\nاكتب الرقم في الشات بسرعة أول واحد يجيبها صح يفوز!')
-            .setColor(0x00AE86)
-            .setFooter({ text: 'فعاليات سيرفر Emsys7' });
+            .setDescription(textMessage)
+            .setColor(0x5865F2)
+            .setTimestamp()
+            .setFooter({ text: `تم الإرسال بواسطة: ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() });
 
-        await interaction.reply({ embeds: [embed] });
+        if (embedTitle) embed.setTitle(embedTitle);
+        if (imageUrl) embed.setImage(imageUrl);
+        if (linkUrl) embed.setURL(linkUrl);
 
-        const filter = response => !response.author.bot;
-        const collector = interaction.channel.createMessageCollector({ filter, time: 15000 });
-
-        collector.on('collect', m => {
-            if (parseInt(m.content) === secretNumber) {
-                m.reply(`🎉 كفوو يا **${m.author.username}**! صكت إجابتك صحيحة والرقم كان **${secretNumber}**!`);
-                collector.stop();
+        // تحديد المستهدف (سواء عبر الـ User Mention أو الـ ID أو الجميع)
+        let targetUser = null;
+        if (userMention) {
+            targetUser = userMention;
+        } else if (userIdInput) {
+            try {
+                targetUser = await client.users.fetch(userIdInput);
+            } catch (err) {
+                return interaction.reply({ content: '❌ الـ ID الذي أدخلته غير صحيح أو أن البوت لا يراه!', ephemeral: true });
             }
-        });
+        }
 
-        collector.on('end', collected => {
-            if (collected.size === 0) {
-                interaction.channel.send(`⏰ انتهى الوقت! محد عرف الرقم، وكان هو: **${secretNumber}**`).catch(() => {});
+        try {
+            if (targetType === 'dm') {
+                // إرسال رسالة خاصة للبريد الخاص بالشخص
+                if (!targetUser) {
+                    return interaction.reply({ content: '❌ يجب عليك تحديد مستخدم (عبر يوزر أو ID) لإرسال الرسالة في الخاص!', ephemeral: true });
+                }
+
+                await targetUser.send({ embeds: [embed] });
+                if (linkUrl) await targetUser.send(`🔗 رابط مرفق: ${linkUrl}`);
+
+                await interaction.reply({ content: `✅ تم إرسال الـ Embed بنجاح إلى الخاص لـ **${targetUser.tag}**!`, ephemeral: true });
+
+            } else {
+                // إرسال في الشات الحالي
+                let finalContent = targetUser ? `<@${targetUser.id}>` : ''; // إذا محدد شخص يسوي له منشن بالروم
+
+                await interaction.reply({ content: '✅ جاري إرسال الرسالة...', ephemeral: true });
+                await interaction.channel.send({
+                    content: finalContent,
+                    embeds: [embed]
+                });
             }
-        });
+        } catch (error) {
+            console.error(error);
+            await interaction.followUp({ content: '❌ حدث خطأ، ربما يكون الشخص مقفل رسائل الخاص (DM) أو صلاحيات البوت ناقصة.', ephemeral: true });
+        }
     }
 });
 
