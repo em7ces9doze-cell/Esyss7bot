@@ -12,18 +12,26 @@ const client = new Client({
 
 const TOKEN = process.env.DISCORD_TOKEN || process.env.TOKEN;
 
-// تعريف الأوامر
+// تعريف الأوامر المحدثة
 const commands = [
     new SlashCommandBuilder()
         .setName('ping')
-        .setDescription('يعرض سرعة استجابة البوت (البينج)'),
+        .setDescription('يعرض سرعة استجابة البوت (البينج) بسرعة فائقة'),
     
+    new SlashCommandBuilder()
+        .setName('bots-status')
+        .setDescription('فحص حالة الاتصال والبينج للبوتات الأخرى في السيرفر'),
+
+    new SlashCommandBuilder()
+        .setName('server-info')
+        .setDescription('عرض معلومات تفصيلية عن السيرفر الحالي'),
+
     new SlashCommandBuilder()
         .setName('say')
         .setDescription('نظام إرسال رسائل احترافي (Embed) للعام أو للخاص مع خيارات متقدمة')
         .addStringOption(option => 
             option.setName('target')
-                .setDescription('مكان الإرسال: الشات الحالي (channel) أو خاص لشخص (dm)')
+                .setDescription('مكان الإرسال: الشات الحالي أو خاص لشخص (DM)')
                 .setRequired(true)
                 .addChoices(
                     { name: 'الشات الحالي (روم)', value: 'channel' },
@@ -35,7 +43,7 @@ const commands = [
                 .setRequired(true))
         .addUserOption(option => 
             option.setName('user')
-                .setDescription('استهداف شخص معين (يوزر) إذا اخترت إرسال خاص أو منشن بالشات')
+                .setDescription('استهداف شخص معين (يوزر) للإرسال أو المنشن')
                 .setRequired(false))
         .addStringOption(option => 
             option.setName('user_id')
@@ -52,11 +60,7 @@ const commands = [
         .addStringOption(option => 
             option.setName('link')
                 .setDescription('رابط سيرفر أو موقع لإضافته (اختياري)')
-                .setRequired(false)),
-
-    new SlashCommandBuilder()
-        .setName('bots-status')
-        .setDescription('فحص حالة الاتصال والبينج للبوتات الأخرى في السيرفر')
+                .setRequired(false))
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -99,23 +103,22 @@ client.on('interactionCreate', async interaction => {
 
     const { commandName } = interaction;
 
+    // 1. أمر البينج السريع والمباشر
     if (commandName === 'ping') {
         const latency = Date.now() - interaction.createdTimestamp;
         await interaction.reply(`🏓 Pong! سرعة الاستجابة: **${Math.abs(latency)}ms**`);
     }
 
+    // 2. أمر حالة البوتات
     else if (commandName === 'bots-status') {
         await interaction.deferReply();
         
-        // جلب أعضاء السيرفر لمعرفة البوتات الموجودة
         await interaction.guild.members.fetch();
         const bots = interaction.guild.members.cache.filter(member => member.user.bot);
 
-        let statusText = `🤖 **حالة البوتات في سيرفر ${interaction.guild.name}:**\n\n`;
-        
+        let statusText = `🤖 **البوتات المتواجدة في سيرفر ${interaction.guild.name}:**\n\n`;
         bots.forEach(bot => {
-            let statusEmoji = '🟢'; // افتراضي متصل
-            statusText += `${statusEmoji} **${bot.user.username}** (ID: \`${bot.id}\`)\n`;
+            statusText += `🟢 **${bot.user.username}** (ID: \`${bot.id}\`)\n`;
         });
 
         const statusEmbed = new EmbedBuilder()
@@ -128,6 +131,29 @@ client.on('interactionCreate', async interaction => {
         await interaction.editReply({ embeds: [statusEmbed] });
     }
 
+    // 3. أمر معلومات السيرفر
+    else if (commandName === 'server-info') {
+        const guild = interaction.guild;
+        const owner = await guild.fetchOwner();
+
+        const serverEmbed = new EmbedBuilder()
+            .setTitle(`📊 معلومات سيرفر: ${guild.name}`)
+            .setThumbnail(guild.iconURL({ dynamic: true }))
+            .setColor(0xF1C40F)
+            .addFields(
+                { name: '👑 صاحب السيرفر', value: `<@${owner.id}>`, inline: true },
+                { name: '👥 عدد الأعضاء', value: `${guild.memberCount} عضو`, inline: true },
+                { name: '🔒 الرتب', value: `${guild.roles.cache.size} رتبة`, inline: true },
+                { name: '📁 الرومات', value: `${guild.channels.cache.size} روم`, inline: true },
+                { name: '📅 تاريخ الإنشاء', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: false }
+            )
+            .setTimestamp()
+            .setFooter({ text: 'EM7', iconURL: client.user.displayAvatarURL() });
+
+        await interaction.reply({ embeds: [serverEmbed] });
+    }
+
+    // 4. نظام Say المطور والمخصص بالكامل
     else if (commandName === 'say') {
         const targetType = interaction.options.getString('target');
         const textMessage = interaction.options.getString('message');
@@ -137,7 +163,7 @@ client.on('interactionCreate', async interaction => {
         const imageUrl = interaction.options.getString('image_url');
         const linkUrl = interaction.options.getString('link');
 
-        // تعديل الـ Footer بحيث يظهر اسم EM7 وصورة البوت فقط بدون اسمك
+        // الـ Footer صار EM7 وصورة البوت فقط بدون اسمك
         const embed = new EmbedBuilder()
             .setDescription(textMessage)
             .setColor(0x5865F2)
