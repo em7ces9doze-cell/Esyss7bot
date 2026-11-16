@@ -1,16 +1,21 @@
 {
-  "name": "em7-ultimate",
-  "version": "5.0.0",
-  "private": true,
-  "description": "EM7 ULTIMATE AI Discord Administration",
+  "name": "em7-ultimate-ai",
+  "version": "1.0.0",
+  "description": "EM7 ULTIMATE AI - Advanced Discord.js v14 + Groq Tool-Calling Agent",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "register": "node index.js --register"
   },
   "engines": {
-    "node": ">=20.18.0"
+    "node": ">=20"
   },
   "dependencies": {
-    "discord.js": "^14.19.3"
-  }
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "groq-sdk": "^0.9.1"
+  },
+  "keywords": ["discord", "ai", "groq", "agent"],
+  "author": "EM7",
+  "license": "UNLICENSED"
 }
