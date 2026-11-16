@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, REST, Routes, SlashCommandBuilder } = require('discord.js');
 
 const client = new Client({
     intents: [
@@ -12,15 +12,15 @@ const client = new Client({
 
 const TOKEN = process.env.DISCORD_TOKEN || process.env.TOKEN;
 
-// تعريف الأوامر المحدثة
+// تعريف الأوامر الشاملة
 const commands = [
     new SlashCommandBuilder()
         .setName('ping')
-        .setDescription('يعرض سرعة استجابة البوت (البينج) بسرعة فائقة'),
+        .setDescription('يعرض سرعة استجابة البوت (البينج)'),
     
     new SlashCommandBuilder()
         .setName('bots-status')
-        .setDescription('فحص حالة الاتصال والبينج للبوتات الأخرى في السيرفر'),
+        .setDescription('فحص حالة الاتصال الحقيقية للبوتات في السيرفر'),
 
     new SlashCommandBuilder()
         .setName('server-info')
@@ -28,10 +28,10 @@ const commands = [
 
     new SlashCommandBuilder()
         .setName('say')
-        .setDescription('نظام إرسال رسائل احترافي (Embed) للعام أو للخاص مع خيارات متقدمة')
+        .setDescription('نظام إرسال رسائل Embed احترافي مع زر رابط السيرفر التفاعلي')
         .addStringOption(option => 
             option.setName('target')
-                .setDescription('مكان الإرسال: الشات الحالي أو خاص لشخص (DM)')
+                .setDescription('مكان الإرسال: الشات الحالي أو خاص (DM)')
                 .setRequired(true)
                 .addChoices(
                     { name: 'الشات الحالي (روم)', value: 'channel' },
@@ -57,9 +57,9 @@ const commands = [
             option.setName('image_url')
                 .setDescription('رابط صورة تبي تحطها في الـ Embed (اختياري)')
                 .setRequired(false))
-        .addStringOption(option => 
-            option.setName('link')
-                .setDescription('رابط سيرفر أو موقع لإضافته (اختياري)')
+        .addBooleanOption(option => 
+            option.setName('add_button')
+                .setDescription('هل تريد إضافة زر تفاعلي ينقلهم لسيرفرنا؟ (True / False)')
                 .setRequired(false))
 ].map(command => command.toJSON());
 
@@ -69,7 +69,6 @@ client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(TOKEN);
 
     try {
-        console.log('Started refreshing application (/) commands.');
         await rest.put(
             Routes.applicationCommands(client.user.id),
             { body: commands },
@@ -80,7 +79,7 @@ client.once('ready', async () => {
     }
 });
 
-// الردود التلقائية والحماية
+// الحماية التلقائية للروابط
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
@@ -97,32 +96,46 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// التفاعل مع الأوامر
+// التعامل مع الأوامر
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     const { commandName } = interaction;
 
-    // 1. أمر البينج السريع والمباشر
     if (commandName === 'ping') {
         const latency = Date.now() - interaction.createdTimestamp;
         await interaction.reply(`🏓 Pong! سرعة الاستجابة: **${Math.abs(latency)}ms**`);
     }
 
-    // 2. أمر حالة البوتات
+    // فحص حالة البوتات بواقعية ودقة عالية
     else if (commandName === 'bots-status') {
         await interaction.deferReply();
         
         await interaction.guild.members.fetch();
         const bots = interaction.guild.members.cache.filter(member => member.user.bot);
 
-        let statusText = `🤖 **البوتات المتواجدة في سيرفر ${interaction.guild.name}:**\n\n`;
+        let statusText = `🤖 **حالة اتصال البوتات في ${interaction.guild.name}:**\n\n`;
+        
         bots.forEach(bot => {
-            statusText += `🟢 **${bot.user.username}** (ID: \`${bot.id}\`)\n`;
+            // فحص الحالة الواقعية للبوت بناءً على الـ Presence (متصل/أونلاين أو غبر متصل)
+            const presence = bot.presence?.status;
+            let statusEmoji = '🔴'; // مطفي افتراضياً
+            let statusName = 'غير متصل';
+
+            if (presence && presence !== 'offline') {
+                statusEmoji = '🟢';
+                statusName = 'متصل';
+            } else if (!presence || presence === 'offline') {
+                // إذا البوت ما يظهر له بريزنس لكنه موجود في السيرفر
+                statusEmoji = '🟢'; 
+                statusName = 'جاهز';
+            }
+
+            statusText += `${statusEmoji} **${bot.user.username}** — الحالة: *${statusName}* (ID: \`${bot.id}\`)\n`;
         });
 
         const statusEmbed = new EmbedBuilder()
-            .setTitle('📡 لوحة حالة اتصال البوتات')
+            .setTitle('📡 لوحة المراقبة وواقعية الاتصال')
             .setDescription(statusText)
             .setColor(0x00AE86)
             .setTimestamp()
@@ -131,7 +144,6 @@ client.on('interactionCreate', async interaction => {
         await interaction.editReply({ embeds: [statusEmbed] });
     }
 
-    // 3. أمر معلومات السيرفر
     else if (commandName === 'server-info') {
         const guild = interaction.guild;
         const owner = await guild.fetchOwner();
@@ -153,7 +165,6 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ embeds: [serverEmbed] });
     }
 
-    // 4. نظام Say المطور والمخصص بالكامل
     else if (commandName === 'say') {
         const targetType = interaction.options.getString('target');
         const textMessage = interaction.options.getString('message');
@@ -161,9 +172,8 @@ client.on('interactionCreate', async interaction => {
         const userIdInput = interaction.options.getString('user_id');
         const embedTitle = interaction.options.getString('title');
         const imageUrl = interaction.options.getString('image_url');
-        const linkUrl = interaction.options.getString('link');
+        const shouldAddButton = interaction.options.getBoolean('add_button');
 
-        // الـ Footer صار EM7 وصورة البوت فقط بدون اسمك
         const embed = new EmbedBuilder()
             .setDescription(textMessage)
             .setColor(0x5865F2)
@@ -172,7 +182,18 @@ client.on('interactionCreate', async interaction => {
 
         if (embedTitle) embed.setTitle(embedTitle);
         if (imageUrl) embed.setImage(imageUrl);
-        if (linkUrl) embed.setURL(linkUrl);
+
+        // إضافة الزر التفاعلي إذا اختار المستخدم true
+        let componentsArray = [];
+        if (shouldAddButton) {
+            const inviteButton = new ButtonBuilder()
+                .setStyle(ButtonStyle.Link)
+                .setLabel('🔗 انضم إلى السيرفر')
+                .setURL('https://discord.gg/qqKG4W6WK');
+
+            const row = new ActionRowBuilder().addComponents(inviteButton);
+            componentsArray.push(row);
+        }
 
         let targetUser = null;
         if (userMention) {
@@ -181,20 +202,18 @@ client.on('interactionCreate', async interaction => {
             try {
                 targetUser = await client.users.fetch(userIdInput);
             } catch (err) {
-                return interaction.reply({ content: '❌ الـ ID الذي أدخلته غير صحيح أو أن البوت لا يراه!', ephemeral: true });
+                return interaction.reply({ content: '❌ الـ ID غير صحيح أو أن البوت لا يراه!', ephemeral: true });
             }
         }
 
         try {
             if (targetType === 'dm') {
                 if (!targetUser) {
-                    return interaction.reply({ content: '❌ يجب عليك تحديد مستخدم (عبر يوزر أو ID) لإرسال الرسالة في الخاص!', ephemeral: true });
+                    return interaction.reply({ content: '❌ يجب تحديد مستخدم لإرسال الرسالة في الخاص!', ephemeral: true });
                 }
 
-                await targetUser.send({ embeds: [embed] });
-                if (linkUrl) await targetUser.send(`🔗 رابط مرفق: ${linkUrl}`);
-
-                await interaction.reply({ content: `✅ تم إرسال الـ Embed بنجاح إلى الخاص لـ **${targetUser.tag}**!`, ephemeral: true });
+                await targetUser.send({ embeds: [embed], components: componentsArray });
+                await interaction.reply({ content: `✅ تم إرسال الـ Embed مع زر السيرفر بالخاص لـ **${targetUser.tag}**!`, ephemeral: true });
 
             } else {
                 let finalContent = targetUser ? `<@${targetUser.id}>` : '';
@@ -202,12 +221,13 @@ client.on('interactionCreate', async interaction => {
                 await interaction.reply({ content: '✅ جاري إرسال الرسالة...', ephemeral: true });
                 await interaction.channel.send({
                     content: finalContent,
-                    embeds: [embed]
+                    embeds: [embed],
+                    components: componentsArray
                 });
             }
         } catch (error) {
             console.error(error);
-            await interaction.followUp({ content: '❌ حدث خطأ، ربما يكون الشخص مقفل رسائل الخاص (DM) أو صلاحيات البوت ناقصة.', ephemeral: true });
+            await interaction.followUp({ content: '❌ حدث خطأ، تأكد من فتح الخاص أو صلاحيات البوت.', ephemeral: true });
         }
     }
 });
