@@ -14,7 +14,7 @@ async function main(){
  const client=new Client({intents:[GatewayIntentBits.Guilds]});
  const controlBridge=createControlBridge({client,db,config,logger});
  client.once(Events.ClientReady,async c=>{logger.info('Ready '+c.user.tag);try{await registerCommands(config);logger.info('Slash commands registered');}catch(e){logger.error(e);}});
- const handler=createInteractionHandler({config,db,groq,executor,logger});
+ const handler=createInteractionHandler({config,db,groq,executor,logger,controlBridge});
  client.on(Events.InteractionCreate,i=>handler(i).catch(e=>logger.error(e)));
  client.on(Events.Error,e=>logger.error(e)); process.on('unhandledRejection',e=>logger.error(e));
  const shutdown=async()=>{controlBridge.stop();try{client.destroy();}finally{db.close();}};
