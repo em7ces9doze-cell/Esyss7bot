@@ -46,3 +46,26 @@ Creates starter source projects from 24 templates. Each generated project requir
 Only OWNER_ID can use management commands. AI can call an explicit allowlist only; no shell, eval, arbitrary JavaScript or arbitrary HTTP. New roles have no permissions. Discord permission checks and role hierarchy still apply. Keep secrets only in FadeHost/backend secret storage, never GitHub.
 
 Run `npm run check` and `npm test`. These are local checks, not live Discord/Groq integration tests. Use persistent storage for the SQLite file.
+
+## EM7 Coins and trial store commands
+
+The current test exchange rate is **90,000,000 ProBot Credits = 1 EM7 Coin**. Initial package prices are provisional test values:
+- Starter: 5 Coins
+- Basic: 10 Coins
+- Pro: 20 Coins
+- Ultimate: 40 Coins
+
+Discord commands:
+- `/e7 balance`: show the caller's wallet.
+- `/e7 shop`: list test hosting packages.
+- `/e7 buy-plan`: deduct coins and create a purchase record.
+- `/e7 request-coins`: create a pending ProBot top-up request.
+- `/e7 ledger`: show the caller's recent ledger entries.
+- `/e7 requests`: owner-only list of pending top-up requests.
+- `/e7 approve-request`: owner-only credit after independently verifying the ProBot transfer.
+- `/e7 credit`: owner-only manual adjustment with a reason.
+- `/e7 test-room`: owner-only private text room for permission tests.
+
+**Payment safety:** the bot does not infer payment from screenshots or ordinary chat messages and does not auto-credit ProBot transfers. The owner must verify the transfer independently, then approve its request. Coin purchases currently create a recorded order with status `pending_provisioning`; they do not deploy or provision a live hosting instance. Hosting automation must be connected separately.
+
+Run `npm run deploy` after updating command definitions so Discord receives the new slash commands. Run `npm test` and `npm run check` before restarting the production bot.
