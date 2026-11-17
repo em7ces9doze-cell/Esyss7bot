@@ -28,6 +28,12 @@ function createInteractionHandler(ctx){
      const rows=commerce.history(i.user.id,8);if(!rows.length)return i.reply({...ephemeral,content:'لا توجد معاملات مسجلة حتى الآن.'});
      return i.reply({...ephemeral,content:'**آخر معاملات محفظتك**\n'+rows.map(x=>(x.delta>0?'+':'')+x.delta+' Coins | '+x.kind+' | الرصيد: '+x.balance_after+' | '+x.created_at.slice(0,10)).join('\n')});
     }
+    if(sub==='requests'){
+     assertOwner(i.user.id,ctx.config);
+     const rows=ctx.db.prepare("SELECT id,user_id,coins,probot_credits,created_at FROM em7_coin_requests WHERE status='pending' ORDER BY id ASC LIMIT 15").all();
+     if(!rows.length)return i.reply({...ephemeral,content:'لا توجد طلبات شحن معلقة.'});
+     return i.reply({...ephemeral,content:'**طلبات شحن ProBot المعلقة**\n'+rows.map(x=>'#'+x.id+' | <@'+x.user_id+'> | '+x.coins+' Coins | '+x.probot_credits+' Credits | '+x.created_at.slice(0,10)).join('\n')+'\n\nبعد التحقق المستقل من التحويل استخدم /e7 credit لإضافة الرصيد، ثم حدّث حالة الطلب في قاعدة البيانات عند المراجعة.'});
+    }
     if(sub==='credit'){
      assertOwner(i.user.id,ctx.config);const user=i.options.getUser('user',true);const amount=i.options.getInteger('amount',true);const reason=i.options.getString('reason',true);
      const balance=commerce.credit({userId:user.id,amount,actorId:i.user.id,reason});
