@@ -34,6 +34,11 @@ function createInteractionHandler(ctx){
      if(!rows.length)return i.reply({...ephemeral,content:'لا توجد طلبات شحن معلقة.'});
      return i.reply({...ephemeral,content:'**طلبات شحن ProBot المعلقة**\n'+rows.map(x=>'#'+x.id+' | <@'+x.user_id+'> | '+x.coins+' Coins | '+x.probot_credits+' Credits | '+x.created_at.slice(0,10)).join('\n')+'\n\nبعد التحقق المستقل من التحويل استخدم /e7 credit لإضافة الرصيد، ثم حدّث حالة الطلب في قاعدة البيانات عند المراجعة.'});
     }
+    if(sub==='approve-request'){
+     assertOwner(i.user.id,ctx.config);const requestId=i.options.getInteger('request_id',true);
+     const approved=commerce.approveRequest(requestId,i.user.id);
+     return i.reply({...ephemeral,content:'تم اعتماد طلب الشحن #'+requestId+' بعد مراجعة التحويل. أضيفت '+approved.coins+' EM7 Coins إلى <@'+approved.userId+'>. الرصيد الجديد: '+approved.balance+'.'});
+    }
     if(sub==='credit'){
      assertOwner(i.user.id,ctx.config);const user=i.options.getUser('user',true);const amount=i.options.getInteger('amount',true);const reason=i.options.getString('reason',true);
      const balance=commerce.credit({userId:user.id,amount,actorId:i.user.id,reason});
