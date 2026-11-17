@@ -33,7 +33,20 @@ function createCommerce(db){
   const result=db.prepare("INSERT INTO em7_coin_requests(user_id,coins,probot_credits,status,created_at) VALUES(?,?,?,'pending',?)").run(userId,coins,credits,now());
   return {id:Number(result.lastInsertRowid),coins,credits};
  }
+ function approveRequest(requestId,actorId){
+  if(!Number.isSafeInteger(requestId)||requestId<1)throw new Error('رقم الطلب غير صالح.');
+  return db.transaction(()=>{
+   const req=db.prepare("SELECT * FROM em7_coin_requests WHERE id=? AND status='pending'").get(requestId);
+   if(!req)throw new Error('الطلب غير موجود أو تمت مراجعته مسبقاً.');
+   ensureWallet(req.user_id);
+   const current=balance(req.user_id);const next=current+req.coins;if(!Number.isSafeInteger(next))throw new Error('تجاوز حد الرصيد.');
+   const t=now();db.prepare('UPDATE em7_wallets SET balance=?,updated_at=? WHERE user_id=?').run(next,t,req.user_id);
+   db.prepare('INSERT INTO em7_ledger(user_id,delta,balance_after,kind,reference,actor_id,details,created_at) VALUES(?,?,?,?,?,?,?,?)').run(req.user_id,req.coins,next,'probot_topup',String(requestId),actorId,'Verified ProBot transfer request #'+requestId,t);
+   db.prepare("UPDATE em7_coin_requests SET status='approved',reviewed_at=?,reviewed_by=? WHERE id=? AND status='pending'").run(t,actorId,requestId);
+   return {userId:req.user_id,coins:req.coins,balance:next};
+  })();
+ }
  function history(userId,limit=8){return db.prepare('SELECT delta,balance_after,kind,details,created_at FROM em7_ledger WHERE user_id=? ORDER BY id DESC LIMIT ?').all(userId,limit);}
- return {balance,credit,buyPlan,requestCoins,history,planPrices:PLAN_PRICES,planLabels:PLAN_LABELS,exchangeCreditsPerCoin:EXCHANGE_CREDITS_PER_COIN};
+ return {balance,credit,buyPlan,requestCoins,approveRequest,history,planPrices:PLAN_PRICES,planLabels:PLAN_LABELS,exchangeCreditsPerCoin:EXCHANGE_CREDITS_PER_COIN};
 }
 module.exports={createCommerce,PLAN_PRICES,PLAN_LABELS,EXCHANGE_CREDITS_PER_COIN};
