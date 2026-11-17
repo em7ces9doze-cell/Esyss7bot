@@ -11,6 +11,7 @@ const e7 = new SlashCommandBuilder().setName('e7').setDescription('أوامر EM
  .addSubcommand(s=>s.setName('request-coins').setDescription('طلب شحن EM7 Coins عبر ProBot').addIntegerOption(o=>o.setName('amount').setDescription('عدد العملات المطلوبة').setRequired(true).setMinValue(1).setMaxValue(1000)))
  .addSubcommand(s=>s.setName('ledger').setDescription('عرض سجل معاملاتك'))
  .addSubcommand(s=>s.setName('requests').setDescription('عرض طلبات شحن العملات المعلقة — للمالك فقط'))
+ .addSubcommand(s=>s.setName('approve-request').setDescription('اعتماد طلب شحن بعد التحقق — للمالك فقط').addIntegerOption(o=>o.setName('request_id').setDescription('رقم طلب الشحن').setRequired(true).setMinValue(1)))
  .addSubcommand(s=>s.setName('credit').setDescription('إضافة عملات بعد التحقق — للمالك فقط').addUserOption(o=>o.setName('user').setDescription('العضو').setRequired(true)).addIntegerOption(o=>o.setName('amount').setDescription('عدد العملات').setRequired(true).setMinValue(1).setMaxValue(100000)).addStringOption(o=>o.setName('reason').setDescription('سبب الإضافة').setRequired(true).setMaxLength(200)))
  .addSubcommand(s=>s.setName('test-room').setDescription('إنشاء روم اختبار للتحقق من صلاحيات البوت'));
 const factory = new SlashCommandBuilder().setName('botfactory').setDescription('مصنع البوتات')
