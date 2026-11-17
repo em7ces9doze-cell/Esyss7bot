@@ -1,0 +1,5 @@
+'use strict';
+const {SlashCommandBuilder}=require('discord.js');
+const e7=new SlashCommandBuilder().setName('e7').setDescription('أوامر E7').addSubcommand(s=>s.setName('ask').setDescription('اطلب من المساعد').addStringOption(o=>o.setName('request').setDescription('الطلب').setRequired(true).setMaxLength(1200))).addSubcommand(s=>s.setName('status').setDescription('الحالة')).addSubcommand(s=>s.setName('help').setDescription('المساعدة')).addSubcommand(s=>s.setName('security').setDescription('الحماية'));
+const factory=new SlashCommandBuilder().setName('botfactory').setDescription('مصنع البوتات').addSubcommand(s=>s.setName('list').setDescription('عرض القوالب')).addSubcommand(s=>s.setName('create').setDescription('إنشاء مشروع').addStringOption(o=>o.setName('template').setDescription('معرف القالب').setRequired(true).setAutocomplete(true)).addStringOption(o=>o.setName('name').setDescription('اسم المشروع').setRequired(true).setMaxLength(40))).addSubcommand(s=>s.setName('info').setDescription('معلومات المصنع'));
+module.exports={commands:[e7,factory]};
