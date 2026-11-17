@@ -32,7 +32,7 @@ function createInteractionHandler(ctx){
      assertOwner(i.user.id,ctx.config);
      const rows=ctx.db.prepare("SELECT id,user_id,coins,probot_credits,created_at FROM em7_coin_requests WHERE status='pending' ORDER BY id ASC LIMIT 15").all();
      if(!rows.length)return i.reply({...ephemeral,content:'لا توجد طلبات شحن معلقة.'});
-     return i.reply({...ephemeral,content:'**طلبات شحن ProBot المعلقة**\n'+rows.map(x=>'#'+x.id+' | <@'+x.user_id+'> | '+x.coins+' Coins | '+x.probot_credits+' Credits | '+x.created_at.slice(0,10)).join('\n')+'\n\nبعد التحقق المستقل من التحويل استخدم /e7 credit لإضافة الرصيد، ثم حدّث حالة الطلب في قاعدة البيانات عند المراجعة.'});
+     return i.reply({...ephemeral,content:'**طلبات شحن ProBot المعلقة**\n'+rows.map(x=>'#'+x.id+' | <@'+x.user_id+'> | '+x.coins+' Coins | '+x.probot_credits+' Credits | '+x.created_at.slice(0,10)).join('\n')+'\n\nبعد التحقق المستقل من التحويل استخدم /e7 approve-request لاعتماد الطلب وإضافة العملات مرة واحدة.'});
     }
     if(sub==='approve-request'){
      assertOwner(i.user.id,ctx.config);const requestId=i.options.getInteger('request_id',true);
