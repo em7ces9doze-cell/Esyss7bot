@@ -1,0 +1,3 @@
+'use strict';
+function createAI(config){if(!config.groqApiKey)return null;return async function ask(prompt){const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+config.groqApiKey,'Content-Type':'application/json'},body:JSON.stringify({model:config.groqModel,messages:[{role:'system',content:'أنت مساعد EM7 SYSTEM. أجب بالعربية بوضوح ولا تدّع تنفيذ إجراءات.'},{role:'user',content:prompt}],temperature:0.4,max_tokens:900}),signal:AbortSignal.timeout(25000)});if(!r.ok)throw Error('فشل مزود AI: HTTP '+r.status);const d=await r.json();return d.choices?.[0]?.message?.content||'لم يصل رد.';};}
+module.exports={createAI};

@@ -1,0 +1,23 @@
+'use strict';
+const {ChannelType,PermissionFlagsBits}=require('discord.js');
+const {PRICES}=require('../services/commerce');
+function createHandler({config,commerce,db,ai}){return async function(interaction){
+ if(!interaction.isChatInputCommand()||interaction.commandName!=='e7')return;
+ const sub=interaction.options.getSubcommand(),owner=interaction.user.id===config.ownerId;
+ try{
+  if(['requests','approve-request','credit','test-room'].includes(sub)&&!owner)return interaction.reply({content:'هذا الأمر للمالك فقط.',ephemeral:true});
+  if(sub==='help')return interaction.reply({content:'EM7 V6: status, balance, shop, buy-plan, request-coins, ledger, ask. أوامر المالك: requests, approve-request, credit, test-room.',ephemeral:true});
+  if(sub==='status')return interaction.reply({content:'EM7 SYSTEM V6 متصل. قاعدة البيانات SQLite.',ephemeral:true});
+  if(sub==='balance')return interaction.reply({content:'رصيدك: '+commerce.balance(interaction.user.id)+' EM7 Coins',ephemeral:true});
+  if(sub==='shop')return interaction.reply({content:Object.entries(PRICES).map(([k,v])=>k+' — '+v+' Coins').join('\n')+'\nالشراء يسجل طلب تجهيز فقط ولا ينشئ استضافة تلقائيًا.',ephemeral:true});
+  if(sub==='buy-plan'){const x=commerce.buyPlan(interaction.user.id,interaction.options.getString('plan'));return interaction.reply({content:'تم تسجيل الطلب #'+x.id+'؛ '+x.plan+'؛ المخصوم '+x.price+'؛ المتبقي '+x.balance+'؛ الحالة pending_provisioning.',ephemeral:true});}
+  if(sub==='request-coins'){const x=commerce.requestCoins(interaction.user.id,interaction.options.getInteger('amount'));return interaction.reply({content:'طلب الشحن #'+x.id+'؛ '+x.coins+' Coins؛ المطلوب '+x.credits+' ProBot Credits. لا يضاف الرصيد إلا بعد التحقق اليدوي.',ephemeral:true});}
+  if(sub==='ledger'){const rows=commerce.history(interaction.user.id);return interaction.reply({content:rows.length?rows.map(x=>'#'+x.id+' '+x.kind+' '+x.delta+' balance='+x.balance_after).join('\n'):'لا توجد معاملات.',ephemeral:true});}
+  if(sub==='requests'){const rows=commerce.pending();return interaction.reply({content:rows.length?rows.map(x=>'#'+x.id+' <@'+x.user_id+'> '+x.coins+' Coins / '+x.credits+' Credits').join('\n'):'لا توجد طلبات معلقة.',ephemeral:true});}
+  if(sub==='approve-request'){const x=commerce.approveRequest(interaction.options.getInteger('request_id'),interaction.user.id);return interaction.reply({content:'تم الاعتماد بعد التحقق. أضيفت '+x.coins+' عملات إلى <@'+x.userId+'>. الرصيد '+x.balance+'.',ephemeral:true});}
+  if(sub==='credit'){const u=interaction.options.getUser('user'),n=interaction.options.getInteger('amount'),reason=interaction.options.getString('reason'),b=commerce.addCoins({userId:u.id,amount:n,actorId:interaction.user.id,reason});return interaction.reply({content:'تمت الإضافة. رصيد <@'+u.id+'>: '+b+'.',ephemeral:true});}
+  if(sub==='test-room'){if(!interaction.guild)return interaction.reply({content:'استخدم الأمر داخل السيرفر.',ephemeral:true});if(!interaction.guild.members.me.permissions.has(PermissionFlagsBits.ManageChannels))return interaction.reply({content:'البوت يحتاج Manage Channels.',ephemeral:true});const ch=await interaction.guild.channels.create({name:'em7-v6-test',type:ChannelType.GuildText,permissionOverwrites:[{id:interaction.guild.id,deny:[PermissionFlagsBits.ViewChannel]},{id:interaction.user.id,allow:[PermissionFlagsBits.ViewChannel,PermissionFlagsBits.SendMessages,PermissionFlagsBits.ReadMessageHistory]},{id:interaction.client.user.id,allow:[PermissionFlagsBits.ViewChannel,PermissionFlagsBits.SendMessages,PermissionFlagsBits.ReadMessageHistory,PermissionFlagsBits.ManageChannels]}],reason:'EM7 V6 private owner test'});db.prepare('INSERT INTO audit_log(actor_id,action,target_id,details,created_at) VALUES(?,?,?,?,?)').run(interaction.user.id,'create_test_room',ch.id,'private test',new Date().toISOString());return interaction.reply({content:'تم إنشاء '+ch,ephemeral:true});}
+  if(sub==='ask'){if(!ai)return interaction.reply({content:'أضف GROQ_API_KEY في متغيرات الاستضافة لتفعيل AI.',ephemeral:true});await interaction.deferReply({ephemeral:true});return interaction.editReply((await ai(interaction.options.getString('prompt'))).slice(0,1900));}
+ }catch(e){const msg=e.message||'حدث خطأ.';if(interaction.deferred||interaction.replied)return interaction.followUp({content:msg,ephemeral:true}).catch(()=>{});return interaction.reply({content:msg,ephemeral:true}).catch(()=>{});}
+};}
+module.exports={createHandler};

@@ -1,25 +1,9 @@
 'use strict';
 const {Client,GatewayIntentBits,Events}=require('discord.js');
-const config=require('./config');
-const {openDatabase}=require('./database/database');
-const {createLogger}=require('./core/logger');
-const {registerCommands}=require('./commands/register');
-const {createGroqClient}=require('./ai/groq-client');
-const {createExecutor}=require('./discord/executor');
-const {createInteractionHandler}=require('./handlers/interaction-handler');
-const {createControlBridge}=require('./integrations/control-bridge');
-async function main(){
- const logger=createLogger(); const db=openDatabase(config.databasePath);
- const groq=createGroqClient(config); const executor=createExecutor({db,config,logger});
- const client=new Client({intents:[GatewayIntentBits.Guilds]});
- const controlBridge=createControlBridge({client,db,config,logger});
- client.once(Events.ClientReady,async c=>{logger.info('Ready '+c.user.tag);try{await registerCommands(config);logger.info('Slash commands registered');}catch(e){logger.error(e);}});
- const handler=createInteractionHandler({config,db,groq,executor,logger,controlBridge});
- client.on(Events.InteractionCreate,i=>handler(i).catch(e=>logger.error(e)));
- client.on(Events.Error,e=>logger.error(e)); process.on('unhandledRejection',e=>logger.error(e));
- const shutdown=async()=>{controlBridge.stop();try{client.destroy();}finally{db.close();}};
- process.once('SIGINT',()=>shutdown().finally(()=>process.exit(0)));
- process.once('SIGTERM',()=>shutdown().finally(()=>process.exit(0)));
- await client.login(config.discordToken);
-}
-main().catch(e=>{console.error(e);process.exit(1);});
+const {loadConfig}=require('./config');
+const {openDatabase}=require('./database');
+const {createCommerce}=require('./services/commerce');
+const {createAI}=require('./services/ai');
+const {createHandler}=require('./handlers/interactions');
+async function main(){const config=loadConfig(),db=openDatabase(config.databasePath),commerce=createCommerce(db),ai=createAI(config),client=new Client({intents:[GatewayIntentBits.Guilds]});client.once(Events.ClientReady,c=>console.log('EM7 SYSTEM V6 ready: '+c.user.tag));client.on(Events.InteractionCreate,createHandler({config,commerce,db,ai}));const close=()=>{db.close();client.destroy();process.exit(0);};process.on('SIGINT',close);process.on('SIGTERM',close);await client.login(config.token);}
+main().catch(e=>{console.error('EM7 startup failed:',e);process.exit(1);});

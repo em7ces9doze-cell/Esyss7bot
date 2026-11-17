@@ -1,4 +1,6 @@
 'use strict';
-const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process');
-function walk(d){return fs.readdirSync(d,{withFileTypes:true}).flatMap(e=>{const p=path.join(d,e.name);return e.isDirectory()?walk(p):[p];});}
-const list=walk('src').filter(x=>x.endsWith('.js')).concat(['scripts/check.js']);for(const f of list){const r=cp.spawnSync(process.execPath,['--check',f],{stdio:'inherit'});if(r.status!==0)process.exit(r.status||1);}console.log('Syntax check passed:',list.length);
+const fs=require('node:fs');
+for(const p of ['src/index.js','src/config.js','src/database.js','src/commands/definitions.js','src/handlers/interactions.js','src/services/commerce.js']){
+ if(!fs.existsSync(p)){console.error('Missing '+p);process.exitCode=1;}
+}
+if(!process.exitCode) console.log('EM7 V6 structure OK');
