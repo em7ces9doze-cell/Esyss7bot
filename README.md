@@ -1,18 +1,26 @@
-# E7 Bot
-Arabic-first Discord.js v14 assistant with Groq tool calling, SQLite persistence, security controls and a 24-template bot factory.
+# EM7 SYSTEM
 
-## Deploy
-Node.js 22.12+. Install with `npm install`, start with `npm start`.
-Set `DISCORD_TOKEN`, `CLIENT_ID`, `OWNER_ID`, `GROQ_API_KEY` in FadeHost environment variables. Optional: `GROQ_MODEL`, `GUILD_ID`, `DATABASE_PATH`, `AI_MAX_TOOL_ROUNDS`, `AI_DAILY_LIMIT`.
-Invite with `bot` and `applications.commands`. Do not grant Administrator by default.
+نسخة أساسية نظيفة لبوت Discord بنظام Node.js 22 وDiscord.js 14.
 
-## Commands
-`/e7 ask`, `/e7 status`, `/e7 help`, `/e7 security`; `/botfactory list`, `/botfactory create`, `/botfactory info`.
+## التشغيل
+1. استخدم Node.js 22 أو أحدث.
+2. نفّذ npm install.
+3. أضف DISCORD_TOKEN وCLIENT_ID وOWNER_ID في متغيرات الاستضافة. لا ترفع ملف .env.
+4. أضف GUILD_ID للتسجيل السريع داخل سيرفر اختبار.
+5. نفّذ npm run deploy مرة واحدة لتسجيل أوامر Slash.
+6. شغّل npm start.
 
-## Factory
-Creates starter source projects from 24 templates. Each generated project requires its own Discord application, token, review, environment variables and deployment. It does not provision Discord applications or hosting automatically.
+## الأوامر
+/e7 help, status, balance, shop, buy-plan, request-coins, ledger, requests, approve-request, credit, test-room, ask.
 
-## Security
-Only OWNER_ID can use management commands. AI can call an explicit allowlist only; no shell, eval, arbitrary JavaScript or arbitrary HTTP. New roles have no permissions. Discord permission checks and role hierarchy still apply. Keep secrets only in FadeHost, never GitHub.
+## التخزين والشراء
+SQLite مع WAL وعمليات معاملات. طلبات شحن الرصيد لا تضيف عملات إلا بعد موافقة المالك. الشراء يسجل طلب تجهيز بحالة pending_provisioning؛ لا يوجد اتصال فعلي بمنصة استضافة ولا يتم إنشاء بوت مستضاف تلقائياً في هذه النسخة.
 
-Run `npm run check` and `npm test`. These are local checks, not live Discord/Groq integration tests. Use persistent storage for the SQLite file.
+## الأمان
+- لا تضع أي Token أو API key في الكود أو GitHub.
+- احفظ الأسرار في Environment Variables لدى FadeHost.
+- صلاحيات الإدارة مقيدة بـ OWNER_ID ولا توجد أوامر shell أو تنفيذ JavaScript عن بُعد.
+- لا تمنح البوت Administrator؛ امنحه أقل الصلاحيات اللازمة.
+
+## التحقق
+نفّذ npm run check ثم npm test. لا تعتبر البوت منشوراً أو مختبراً على Discord حتى تشغيله فعلياً في بيئة الاستضافة.

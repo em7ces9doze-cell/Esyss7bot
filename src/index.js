@@ -1,20 +1,8 @@
-'use strict';
-const {Client,GatewayIntentBits,Events}=require('discord.js');
-const config=require('./config');
-const {openDatabase}=require('./database/database');
-const {createLogger}=require('./core/logger');
-const {registerCommands}=require('./commands/register');
-const {createGroqClient}=require('./ai/groq-client');
-const {createExecutor}=require('./discord/executor');
-const {createInteractionHandler}=require('./handlers/interaction-handler');
-async function main(){
- const logger=createLogger(); const db=openDatabase(config.databasePath);
- const groq=createGroqClient(config); const executor=createExecutor({db,config,logger});
- const client=new Client({intents:[GatewayIntentBits.Guilds]});
- client.once(Events.ClientReady,async c=>{logger.info('Ready '+c.user.tag);try{await registerCommands(config);logger.info('Slash commands registered');}catch(e){logger.error(e);}});
- const handler=createInteractionHandler({config,db,groq,executor,logger});
- client.on(Events.InteractionCreate,i=>handler(i).catch(e=>logger.error(e)));
- client.on(Events.Error,e=>logger.error(e)); process.on('unhandledRejection',e=>logger.error(e));
- await client.login(config.discordToken);
-}
-main().catch(e=>{console.error(e);process.exit(1);});
+"use strict";
+const {Client,GatewayIntentBits,Events}=require("discord.js");
+const {loadConfig}=require("./config");
+const {openDatabase}=require("./database");
+const {createCommerce}=require("./services/commerce");
+const {createInteractionHandler}=require("./handlers/interactions");
+async function main(){const config=loadConfig();const db=openDatabase(config.databasePath);const commerce=createCommerce(db);const client=new Client({intents:[GatewayIntentBits.Guilds]});client.once(Events.ClientReady,ready=>console.log("EM7 SYSTEM ready as "+ready.user.tag));client.on(Events.InteractionCreate,createInteractionHandler({config,commerce,db,client}));client.on(Events.Error,error=>console.error("Discord client error:",error));await client.login(config.token);const shutdown=signal=>{console.log("Received "+signal+"; shutting down.");client.destroy();db.close();process.exit(0);};process.once("SIGINT",()=>shutdown("SIGINT"));process.once("SIGTERM",()=>shutdown("SIGTERM"));}
+main().catch(error=>{console.error("EM7 startup failed:",error);process.exitCode=1;});
