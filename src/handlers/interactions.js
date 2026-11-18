@@ -441,6 +441,15 @@ function createInteractionHandler({ config, commerce, tickets, db, client }) {
         if (!me.permissions.has(PermissionFlagsBits.ManageChannels)) {
           return interaction.reply({ content: "البوت يحتاج صلاحية Manage Channels لفتح تذاكر الدعم.", ephemeral: true });
         }
+        const ownerMember = config.ownerId === interaction.user.id
+          ? null
+          : await interaction.guild.members.fetch(config.ownerId).catch(() => null);
+        if (config.ownerId !== interaction.user.id && !ownerMember) {
+          return interaction.reply({
+            content: "حساب إدارة EM7 غير موجود في هذا السيرفر؛ لا يمكن إنشاء تذكرة خاصة قابلة للمتابعة.",
+            ephemeral: true
+          });
+        }
         const existing = tickets.findOpen(interaction.guildId, interaction.user.id);
         if (existing) {
           const existingChannel = await interaction.guild.channels.fetch(existing.channel_id).catch(() => null);
