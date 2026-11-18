@@ -24,6 +24,9 @@ function createTickets(db) {
   const findByChannel = db.prepare(
     "SELECT * FROM support_tickets WHERE channel_id=? LIMIT 1"
   );
+  const findRecent = db.prepare(
+    "SELECT * FROM support_tickets WHERE guild_id=? AND user_id=? AND created_at >= datetime('now', ?) ORDER BY id DESC LIMIT 1"
+  );
 
   const createTx = db.transaction(({ guildId, userId, channelId, category }) => {
     const existing = findOpen.get(guildId, userId);
@@ -64,6 +67,8 @@ function createTickets(db) {
   return {
     create: createTx,
     findOpen: (guildId, userId) => findOpen.get(guildId, userId) || null,
+    findRecent: (guildId, userId, seconds=60) =>
+      findRecent.get(guildId, userId, "-" + Math.max(1, Math.min(seconds, 3600)) + " seconds") || null,
     findByChannel: channelId => findByChannel.get(channelId) || null,
     claim: claimTx,
     close: closeTx
