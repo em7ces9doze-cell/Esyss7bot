@@ -41,6 +41,20 @@ test("rejected top-up requests are not credited and cannot be reviewed twice", (
   db.close();
 });
 
+test("admin summary and audit history report persisted wallet activity", () => {
+  const db = openDatabase(":memory:");
+  const commerce = createCommerce(db);
+  commerce.credit("u5", 30, "admin test credit", "owner");
+  commerce.requestTopup("u6", 15, "pending test");
+  const summary = commerce.adminSummary();
+  assert.equal(summary.wallets.users, 1);
+  assert.equal(summary.wallets.coins, 30);
+  assert.equal(summary.pendingTopups.count, 1);
+  assert.equal(summary.pendingTopups.amount, 15);
+  assert.ok(commerce.listAudit(10).some(row => row.action === "wallet.credit"));
+  db.close();
+});
+
 test("command registration preserves unrelated commands and replaces EM7", () => {
   const registered = [
     { id: "legacy-id", application_id: "app-id", name: "moderation", description: "mod", type: 1 },
