@@ -7,6 +7,27 @@ const command = new SlashCommandBuilder()
   .setDescription("أوامر نظام EM7 وEM7 HOST")
   .addSubcommand(s => s.setName("help").setDescription("عرض دليل أوامر EM7"))
   .addSubcommand(s => s.setName("status").setDescription("حالة تشغيل بوت EM7"))
+  .addSubcommand(s =>
+    s.setName("support")
+      .setDescription("فتح تذكرة دعم خاصة مع فريق EM7")
+      .addStringOption(o =>
+        o.setName("category")
+          .setDescription("نوع طلب الدعم")
+          .setRequired(true)
+          .addChoices(
+            { name: "استضافة بوت", value: "hosting" },
+            { name: "العملات والفواتير", value: "billing" },
+            { name: "مشكلة تقنية", value: "technical" },
+            { name: "طلب آخر", value: "other" }
+          )
+      )
+      .addStringOption(o =>
+        o.setName("details")
+          .setDescription("اشرح المشكلة باختصار")
+          .setRequired(true)
+          .setMaxLength(700)
+      )
+  )
   .addSubcommand(s => s.setName("website").setDescription("فتح موقع EM7 HOST الرسمي"))
   .addSubcommand(s => s.setName("plans").setDescription("استعراض باقات استضافة EM7 HOST"))
   .addSubcommand(s => s.setName("balance").setDescription("عرض رصيد EM7 Coins"))
