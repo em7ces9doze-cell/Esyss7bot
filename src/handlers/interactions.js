@@ -229,7 +229,7 @@ function createInteractionHandler({ config, commerce, db, client }) {
             ? rows.map(row =>
               "`#" + row.id + "` • **" + String(row.action).slice(0, 70) +
               "** • <@" + row.actor_id + "> • " + String(row.created_at)
-            ).join("\\n").slice(0, 3900)
+            ).join("\n").slice(0, 3900)
             : "لا توجد إجراءات مسجلة حتى الآن.";
           const embed = new EmbedBuilder()
             .setColor(0x7655c9)
