@@ -204,8 +204,8 @@ function createInteractionHandler({ config, commerce, db, client }) {
           const description = rows.length
             ? rows.map(row =>
               "`#" + row.id + "` • <@" + row.user_id + "> • " +
-              row.amount + " Coins • " + String(row.note).replace(/\\s+/g, " ").slice(0, 70)
-            ).join("\\n").slice(0, 3900)
+              row.amount + " Coins • " + String(row.note).replace(/\s+/g, " ").slice(0, 70)
+            ).join("\n").slice(0, 3900)
             : "لا توجد طلبات شحن معلقة.";
           const embed = new EmbedBuilder()
             .setColor(0x7655c9)
