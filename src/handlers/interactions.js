@@ -242,13 +242,16 @@ function createInteractionHandler({ config, commerce, tickets, db, client }) {
             return interaction.reply({ content: "إغلاق التذكرة متاح لصاحبها أو إدارة EM7 فقط.", ephemeral: true });
           }
           await interaction.deferReply({ ephemeral: true });
-          const closed = tickets.close(interaction.channelId, interaction.user.id);
-          if (!closed) {
-            return interaction.editReply({ content: "التذكرة مغلقة بالفعل." });
-          }
           await interaction.channel.permissionOverwrites.edit(ticket.user_id, {
             SendMessages: false
           });
+          const closed = tickets.close(interaction.channelId, interaction.user.id);
+          if (!closed) {
+            await interaction.channel.permissionOverwrites.edit(ticket.user_id, {
+              SendMessages: true
+            }).catch(() => null);
+            return interaction.editReply({ content: "التذكرة مغلقة بالفعل." });
+          }
           await interaction.channel.setTopic(
             "EM7 Support | Ticket #" + ticket.id + " | CLOSED | " + ticket.category
           );
@@ -471,6 +474,7 @@ function createInteractionHandler({ config, commerce, tickets, db, client }) {
 
         await interaction.deferReply({ ephemeral: true });
         let channel = null;
+        let ticketRecord = null;
         try {
           const suffix = interaction.user.id.slice(-4);
           const safeName = interaction.user.username.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 16) || "member";
@@ -533,6 +537,7 @@ function createInteractionHandler({ config, commerce, tickets, db, client }) {
             });
           }
 
+          ticketRecord = created.ticket;
           await channel.setTopic(
             "EM7 Support | Ticket #" + created.ticket.id + " | " +
             TICKET_CATEGORIES[created.ticket.category]
@@ -562,6 +567,7 @@ function createInteractionHandler({ config, commerce, tickets, db, client }) {
           });
           return interaction.editReply({ content: "تم فتح تذكرة الدعم الخاصة بك: " + channel });
         } catch (error) {
+          if (ticketRecord && channel) tickets.close(channel.id, config.ownerId);
           if (channel) await channel.delete("Rollback failed EM7 support ticket").catch(() => null);
           throw error;
         }
