@@ -1,5 +1,4 @@
 "use strict";
-const PLANS = Object.freeze({ starter:{label:"Starter",price:5}, basic:{label:"Basic",price:10}, pro:{label:"Pro",price:20}, ultimate:{label:"Ultimate",price:40} });
 const MAX_COINS = 100000000;
 function createCommerce(db) {
  const wallet = db.prepare("SELECT balance FROM wallets WHERE user_id = ?");
@@ -19,7 +18,7 @@ function createCommerce(db) {
   audit.run(ownerId,"topup.reject",JSON.stringify({requestId,userId:request.user_id,amount:request.amount,reason:String(reason).slice(0,200)}));
   return {userId:request.user_id,amount:request.amount,reason:String(reason).slice(0,200)};
  });
- const buyTx = db.transaction((userId,planKey) => { const plan=PLANS[planKey]; if(!plan) throw new Error("Unknown plan"); const newBalance=debitTx(userId,plan.price,"Purchase "+plan.label,userId); const result=db.prepare("INSERT INTO purchases(user_id,plan,price,status) VALUES(?,?,?,'pending_provisioning')").run(userId,planKey,plan.price); return {id:Number(result.lastInsertRowid),plan,balance:newBalance,status:"pending_provisioning"}; });
- return { balance, credit:creditTx, debit:debitTx, requestTopup:requestTx, approveTopup:approveTx, rejectTopup:rejectTx, buyPlan:buyTx, listPending:(limit=10)=>db.prepare("SELECT id,user_id,amount,note,created_at FROM topup_requests WHERE status='pending' ORDER BY id LIMIT ?").all(Math.min(Math.max(limit,1),50)), ledger:(userId,limit=10)=>db.prepare("SELECT id,delta,balance_after,reason,created_at FROM ledger WHERE user_id=? ORDER BY id DESC LIMIT ?").all(userId,Math.min(Math.max(limit,1),25)) };
+
+ return { balance, credit:creditTx, debit:debitTx, requestTopup:requestTx, approveTopup:approveTx, rejectTopup:rejectTx, listPending:(limit=10)=>db.prepare("SELECT id,user_id,amount,note,created_at FROM topup_requests WHERE status='pending' ORDER BY id LIMIT ?").all(Math.min(Math.max(limit,1),50)), ledger:(userId,limit=10)=>db.prepare("SELECT id,delta,balance_after,reason,created_at FROM ledger WHERE user_id=? ORDER BY id DESC LIMIT ?").all(userId,Math.min(Math.max(limit,1),25)) };
 }
-module.exports = { createCommerce, PLANS };
+module.exports = { createCommerce };
