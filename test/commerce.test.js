@@ -28,6 +28,19 @@ test("top-up request is not credited before approval and cannot be approved twic
   db.close();
 });
 
+test("rejected top-up requests are not credited and cannot be reviewed twice", () => {
+  const db = openDatabase(":memory:");
+  const commerce = createCommerce(db);
+  const id = commerce.requestTopup("u4", 50, "test request");
+  const rejected = commerce.rejectTopup(id, "owner", "missing payment proof");
+  assert.equal(rejected.userId, "u4");
+  assert.equal(rejected.amount, 50);
+  assert.equal(commerce.balance("u4"), 0);
+  assert.throws(() => commerce.rejectTopup(id, "owner", "duplicate"), /already reviewed/);
+  assert.throws(() => commerce.approveTopup(id, "owner"), /already reviewed/);
+  db.close();
+});
+
 test("purchase debits wallet and remains pending provisioning", () => {
   const db = openDatabase(":memory:");
   const commerce = createCommerce(db);
