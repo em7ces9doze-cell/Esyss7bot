@@ -54,6 +54,16 @@ const command = new SlashCommandBuilder()
       )
   )
   .addSubcommand(s =>
+    s.setName("reject-request")
+      .setDescription("رفض طلب شحن عملات - للإدارة")
+      .addIntegerOption(o =>
+        o.setName("id").setDescription("رقم الطلب").setRequired(true).setMinValue(1)
+      )
+      .addStringOption(o =>
+        o.setName("reason").setDescription("سبب الرفض").setRequired(true).setMaxLength(200)
+      )
+  )
+  .addSubcommand(s =>
     s.setName("credit")
       .setDescription("إضافة عملات إلى محفظة عضو - للإدارة")
       .addUserOption(o => o.setName("user").setDescription("العضو").setRequired(true))

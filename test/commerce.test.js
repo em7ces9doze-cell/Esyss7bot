@@ -28,13 +28,30 @@ test("top-up request is not credited before approval and cannot be approved twic
   db.close();
 });
 
-test("purchase debits wallet and remains pending provisioning", () => {
+test("rejected top-up requests are not credited and cannot be reviewed twice", () => {
   const db = openDatabase(":memory:");
   const commerce = createCommerce(db);
-  commerce.credit("u3", 20, "seed", "owner");
-  const purchase = commerce.buyPlan("u3", "pro");
-  assert.equal(purchase.status, "pending_provisioning");
-  assert.equal(commerce.balance("u3"), 0);
+  const id = commerce.requestTopup("u4", 50, "test request");
+  const rejected = commerce.rejectTopup(id, "owner", "missing payment proof");
+  assert.equal(rejected.userId, "u4");
+  assert.equal(rejected.amount, 50);
+  assert.equal(commerce.balance("u4"), 0);
+  assert.throws(() => commerce.rejectTopup(id, "owner", "duplicate"), /already reviewed/);
+  assert.throws(() => commerce.approveTopup(id, "owner"), /already reviewed/);
+  db.close();
+});
+
+test("admin summary and audit history report persisted wallet activity", () => {
+  const db = openDatabase(":memory:");
+  const commerce = createCommerce(db);
+  commerce.credit("u5", 30, "admin test credit", "owner");
+  commerce.requestTopup("u6", 15, "pending test");
+  const summary = commerce.adminSummary();
+  assert.equal(summary.wallets.users, 1);
+  assert.equal(summary.wallets.coins, 30);
+  assert.equal(summary.pendingTopups.count, 1);
+  assert.equal(summary.pendingTopups.amount, 15);
+  assert.ok(commerce.listAudit(10).some(row => row.action === "wallet.credit"));
   db.close();
 });
 

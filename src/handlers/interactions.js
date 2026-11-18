@@ -13,6 +13,8 @@ const { askGroq } = require("../services/ai");
 const HOST_URL = "https://em7host-nvenijcy.manus.space";
 const HOST_CHANNEL_NAME = "host-em7";
 const HOST_EMBED_TITLE = "EM7 HOST | استضافة بوتات Discord";
+const AI_COOLDOWN_MS = 20000;
+const aiCooldowns = new Map();
 
 function hostEmbed() {
   return new EmbedBuilder()
@@ -63,6 +65,20 @@ function adminPanelRows() {
       new ButtonBuilder()
         .setCustomId("em7_admin_status")
         .setLabel("فحص حالة البوت")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId("em7_topup_requests")
+        .setLabel("طلبات شحن العملات")
+        .setStyle(ButtonStyle.Secondary)
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("em7_economy_stats")
+        .setLabel("ملخص العملات")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId("em7_audit_log")
+        .setLabel("سجل الإدارة")
         .setStyle(ButtonStyle.Secondary)
     ),
     hostLinkRow()
@@ -91,7 +107,9 @@ function statusEmbed(client) {
     .addFields(
       { name: "الحالة", value: "متصل", inline: true },
       { name: "زمن الاستجابة", value: ping, inline: true },
-      { name: "مدة التشغيل", value: formatUptime(client.uptime), inline: false },
+      { name: "مدة التشغيل", value: formatUptime(client.uptime), inline: true },
+      { name: "السيرفرات", value: String(client.guilds.cache.size), inline: true },
+      { name: "استخدام الذاكرة", value: Math.round(process.memoryUsage().rss / 1024 / 1024) + " MB", inline: true },
       { name: "المنصة المرتبطة", value: "[EM7 HOST](" + HOST_URL + ")", inline: false }
     )
     .setTimestamp();
@@ -184,12 +202,66 @@ function createInteractionHandler({ config, commerce, db, client }) {
   return async function handle(interaction) {
     try {
       if (interaction.isButton()) {
-        if (!["em7_host_create_room", "em7_admin_status"].includes(interaction.customId)) return;
+        if (!["em7_host_create_room", "em7_admin_status", "em7_topup_requests", "em7_economy_stats", "em7_audit_log"].includes(interaction.customId)) return;
         if (interaction.user.id !== config.ownerId) {
           return interaction.reply({ content: "هذا الإجراء مخصص لإدارة EM7.", ephemeral: true });
         }
         if (interaction.customId === "em7_admin_status") {
           return interaction.reply({ embeds: [statusEmbed(client)], ephemeral: true });
+        }
+        if (interaction.customId === "em7_economy_stats") {
+          const stats = commerce.adminSummary();
+          const embed = new EmbedBuilder()
+            .setColor(0x7655c9)
+            .setTitle("EM7 Coins | الملخص المالي")
+            .addFields(
+              { name: "المحافظ المسجلة", value: String(stats.wallets.users), inline: true },
+              { name: "إجمالي العملات", value: Number(stats.wallets.coins).toLocaleString("en-US"), inline: true },
+              { name: "طلبات معلقة", value: String(stats.pendingTopups.count) + " • " + Number(stats.pendingTopups.amount).toLocaleString("en-US") + " Coins", inline: false },
+              { name: "طلبات معتمدة", value: String(stats.approvedTopups.count) + " • " + Number(stats.approvedTopups.amount).toLocaleString("en-US") + " Coins", inline: false }
+            )
+            .setTimestamp();
+          return interaction.reply({ embeds: [embed], ephemeral: true });
+        }
+        if (interaction.customId === "em7_audit_log") {
+          const rows = commerce.listAudit(15);
+          const description = rows.length
+            ? rows.map(row =>
+              "`#" + row.id + "` • **" + String(row.action).slice(0, 70) +
+              "** • <@" + row.actor_id + "> • " + String(row.created_at)
+            ).join("\n").slice(0, 3900)
+            : "لا توجد إجراءات مسجلة حتى الآن.";
+          const embed = new EmbedBuilder()
+            .setColor(0x7655c9)
+            .setTitle("EM7 | سجل إجراءات الإدارة")
+            .setDescription(description)
+            .setFooter({ text: "آخر 15 إجراءً" })
+            .setTimestamp();
+          return interaction.reply({
+            embeds: [embed],
+            ephemeral: true,
+            allowedMentions: { parse: [] }
+          });
+        }
+        if (interaction.customId === "em7_topup_requests") {
+          const rows = commerce.listPending(15);
+          const description = rows.length
+            ? rows.map(row =>
+              "`#" + row.id + "` • <@" + row.user_id + "> • " +
+              row.amount + " Coins • " + String(row.note).replace(/\s+/g, " ").slice(0, 70)
+            ).join("\n").slice(0, 3900)
+            : "لا توجد طلبات شحن معلقة.";
+          const embed = new EmbedBuilder()
+            .setColor(0x7655c9)
+            .setTitle("طلبات شحن EM7 Coins")
+            .setDescription(description)
+            .setFooter({ text: "أحدث 15 طلبًا معلّقًا" })
+            .setTimestamp();
+          return interaction.reply({
+            embeds: [embed],
+            ephemeral: true,
+            allowedMentions: { parse: [] }
+          });
         }
         if (!interaction.guild) {
           return interaction.reply({ content: "استخدم هذا الزر داخل سيرفر Discord.", ephemeral: true });
@@ -215,6 +287,7 @@ function createInteractionHandler({ config, commerce, db, client }) {
       const ownerOnly = new Set([
         "requests",
         "approve-request",
+        "reject-request",
         "credit",
         "test-room",
         "host-room",
@@ -252,7 +325,7 @@ function createInteractionHandler({ config, commerce, db, client }) {
             "**أوامر الإدارة**",
             "`/e7 admin-panel` — لوحة إدارة EM7 HOST",
             "`/e7 host-room` — إنشاء أو تحديث روم الموقع",
-            "`/e7 requests` و`/e7 approve-request` و`/e7 credit`"
+            "`/e7 requests` و`/e7 approve-request` و`/e7 reject-request` و`/e7 credit`"
           ].join("\n")
         });
       }
@@ -368,7 +441,31 @@ function createInteractionHandler({ config, commerce, db, client }) {
             row.amount + " Coins • " + String(row.note).slice(0, 80)
           ).join("\n").slice(0, 1900)
           : "لا توجد طلبات شحن معلقة.";
-        return interaction.reply({ ephemeral: true, content });
+        return interaction.reply({ ephemeral: true, content, allowedMentions: { parse: [] } });
+      }
+
+      if (sub === "reject-request") {
+        const result = commerce.rejectTopup(
+          interaction.options.getInteger("id"),
+          interaction.user.id,
+          interaction.options.getString("reason")
+        );
+        await interaction.reply({
+          ephemeral: true,
+          content: "تم رفض طلب الشحن **#" + interaction.options.getInteger("id") +
+            "** بقيمة " + result.amount + " Coins. لم تتم إضافة عملات إلى المحفظة."
+        });
+        const user = await client.users.fetch(result.userId).catch(() => null);
+        if (user) {
+          await user.send(
+            "تم رفض طلب شحن EM7 Coins. السبب: " + result.reason
+          ).catch(() => null);
+        }
+        audit(db, interaction.user.id, "coins.topup.reject", {
+          userId: result.userId,
+          amount: result.amount
+        });
+        return;
       }
 
       if (sub === "approve-request") {
@@ -453,6 +550,21 @@ function createInteractionHandler({ config, commerce, db, client }) {
       }
 
       if (sub === "ask") {
+        const now = Date.now();
+        const lastRequest = aiCooldowns.get(interaction.user.id) || 0;
+        const waitMs = AI_COOLDOWN_MS - (now - lastRequest);
+        if (waitMs > 0) {
+          return interaction.reply({
+            ephemeral: true,
+            content: "انتظر " + Math.ceil(waitMs / 1000) + " ثانية قبل إرسال سؤال جديد إلى EM7 AI."
+          });
+        }
+        aiCooldowns.set(interaction.user.id, now);
+        if (aiCooldowns.size > 5000) {
+          for (const [userId, timestamp] of aiCooldowns) {
+            if (now - timestamp > AI_COOLDOWN_MS * 2) aiCooldowns.delete(userId);
+          }
+        }
         await interaction.deferReply({ ephemeral: true });
         const answer = await askGroq({
           apiKey: config.groqApiKey,
