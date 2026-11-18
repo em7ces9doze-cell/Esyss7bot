@@ -13,6 +13,7 @@ const command = new SlashCommandBuilder().setName("e7").setDescription("أوام
 .addSubcommand(s=>s.setName("requests").setDescription("طلبات شحن العملات المعلقة - للإدارة"))
 .addSubcommand(s=>s.setName("approve-request").setDescription("اعتماد طلب شحن - للإدارة").addIntegerOption(o=>o.setName("id").setDescription("رقم الطلب").setRequired(true).setMinValue(1)))
 .addSubcommand(s=>s.setName("credit").setDescription("إضافة عملات - للإدارة").addUserOption(o=>o.setName("user").setDescription("العضو").setRequired(true)).addIntegerOption(o=>o.setName("amount").setDescription("الكمية").setRequired(true).setMinValue(1).setMaxValue(1000000)).addStringOption(o=>o.setName("reason").setDescription("السبب").setRequired(true).setMaxLength(200)))
+.addSubcommand(s=>s.setName("admin-panel").setDescription("فتح لوحة إدارة EM7 HOST - للإدارة"))
 .addSubcommand(s=>s.setName("host-room").setDescription("إنشاء روم EM7 HOST الرسمي - للإدارة"))
 .addSubcommand(s=>s.setName("test-room").setDescription("إنشاء روم اختبار خاص بالمالك"))
 .addSubcommand(s=>s.setName("ask").setDescription("اسأل مساعد EM7 AI").addStringOption(o=>o.setName("prompt").setDescription("سؤالك").setRequired(true).setMaxLength(3000)));
