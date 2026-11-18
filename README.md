@@ -25,7 +25,7 @@
 ## أوامر المالك
 - `/e7 admin-panel` — لوحة الإدارة.
 - `/e7 host-room` — إنشاء أو تحديث قناة `#host-em7` ورسالة التعريف دون تكرار الرسائل.
-- `/e7 requests`, `/e7 approve-request`, `/e7 credit` — إدارة العملات.
+- `/e7 requests`, `/e7 approve-request`, `/e7 reject-request`, `/e7 credit` — إدارة العملات وطلبات الشحن.
 - `/e7 test-room` — إنشاء قناة اختبار خاصة.
 
 ## التكامل مع EM7 HOST
