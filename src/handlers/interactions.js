@@ -115,6 +115,26 @@ function statusEmbed(client) {
     .setTimestamp();
 }
 
+const TICKET_CATEGORIES = {
+  hosting: "استضافة بوت",
+  billing: "العملات والفواتير",
+  technical: "مشكلة تقنية",
+  other: "طلب آخر"
+};
+
+function ticketControls() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("em7_ticket_claim")
+      .setLabel("استلام التذكرة")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("em7_ticket_close")
+      .setLabel("إغلاق التذكرة")
+      .setStyle(ButtonStyle.Danger)
+  );
+}
+
 async function ensureHostChannel(guild, client) {
   const me = guild.members.me || await guild.members.fetch(client.user.id);
   if (!me.permissions.has(PermissionFlagsBits.ManageChannels)) {
@@ -198,10 +218,44 @@ function audit(db, actorId, action, details) {
   }
 }
 
-function createInteractionHandler({ config, commerce, db, client }) {
+function createInteractionHandler({ config, commerce, tickets, db, client }) {
   return async function handle(interaction) {
     try {
       if (interaction.isButton()) {
+        if (["em7_ticket_claim", "em7_ticket_close"].includes(interaction.customId)) {
+          const ticket = tickets.findByChannel(interaction.channelId);
+          if (!ticket || ticket.status !== "open") {
+            return interaction.reply({ content: "هذه التذكرة غير موجودة أو مغلقة.", ephemeral: true });
+          }
+          if (interaction.customId === "em7_ticket_claim") {
+            if (interaction.user.id !== config.ownerId) {
+              return interaction.reply({ content: "استلام التذاكر مخصص لإدارة EM7.", ephemeral: true });
+            }
+            const result = tickets.claim(interaction.channelId, interaction.user.id);
+            if (!result.claimed) {
+              return interaction.reply({ content: "تم استلام هذه التذكرة مسبقًا.", ephemeral: true });
+            }
+            audit(db, interaction.user.id, "support.ticket.claim", { ticketId: ticket.id, channelId: ticket.channel_id });
+            return interaction.reply({ content: "تم استلام التذكرة بنجاح.", ephemeral: true });
+          }
+          if (interaction.user.id !== ticket.user_id && interaction.user.id !== config.ownerId) {
+            return interaction.reply({ content: "إغلاق التذكرة متاح لصاحبها أو إدارة EM7 فقط.", ephemeral: true });
+          }
+          await interaction.deferReply({ ephemeral: true });
+          const closed = tickets.close(interaction.channelId, interaction.user.id);
+          if (!closed) {
+            return interaction.editReply({ content: "التذكرة مغلقة بالفعل." });
+          }
+          await interaction.channel.permissionOverwrites.edit(ticket.user_id, {
+            SendMessages: false
+          });
+          await interaction.channel.setTopic(
+            "EM7 Support | Ticket #" + ticket.id + " | CLOSED | " + ticket.category
+          );
+          await interaction.message.edit({ components: [] }).catch(() => null);
+          audit(db, interaction.user.id, "support.ticket.close", { ticketId: ticket.id, channelId: ticket.channel_id });
+          return interaction.editReply({ content: "تم إغلاق التذكرة. ستبقى القناة متاحة للقراءة." });
+        }
         if (!["em7_host_create_room", "em7_admin_status", "em7_topup_requests", "em7_economy_stats", "em7_audit_log"].includes(interaction.customId)) return;
         if (interaction.user.id !== config.ownerId) {
           return interaction.reply({ content: "هذا الإجراء مخصص لإدارة EM7.", ephemeral: true });
@@ -312,6 +366,7 @@ function createInteractionHandler({ config, commerce, db, client }) {
             "`/e7 website` — فتح المنصة الرسمية",
             "`/e7 plans` — عرض الباقات في الموقع",
             "`/e7 buy-plan` — اختيار باقة ومتابعة الطلب في الموقع",
+            "`/e7 support` — فتح تذكرة دعم خاصة مع فريق EM7",
             "",
             "**EM7 Coins**",
             "`/e7 balance` — رصيدك",
@@ -376,6 +431,124 @@ function createInteractionHandler({ config, commerce, db, client }) {
           components: adminPanelRows(),
           ephemeral: true
         });
+      }
+
+      if (sub === "support") {
+        if (!interaction.guild) {
+          return interaction.reply({ content: "افتح تذكرة الدعم من داخل سيرفر EM7.", ephemeral: true });
+        }
+        const me = interaction.guild.members.me || await interaction.guild.members.fetch(client.user.id);
+        if (!me.permissions.has(PermissionFlagsBits.ManageChannels)) {
+          return interaction.reply({ content: "البوت يحتاج صلاحية Manage Channels لفتح تذاكر الدعم.", ephemeral: true });
+        }
+        const existing = tickets.findOpen(interaction.guildId, interaction.user.id);
+        if (existing) {
+          const existingChannel = await interaction.guild.channels.fetch(existing.channel_id).catch(() => null);
+          if (existingChannel) {
+            return interaction.reply({
+              content: "لديك تذكرة مفتوحة بالفعل: " + existingChannel,
+              ephemeral: true
+            });
+          }
+          tickets.close(existing.channel_id, config.ownerId);
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+        let channel = null;
+        try {
+          const suffix = interaction.user.id.slice(-4);
+          const safeName = interaction.user.username.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 16) || "member";
+          channel = await interaction.guild.channels.create({
+            name: "support-" + safeName + "-" + suffix,
+            type: ChannelType.GuildText,
+            topic: "EM7 Support | " + TICKET_CATEGORIES[interaction.options.getString("category")],
+            reason: "Create private EM7 support ticket",
+            permissionOverwrites: [
+              {
+                id: interaction.guild.roles.everyone.id,
+                deny: [PermissionFlagsBits.ViewChannel]
+              },
+              {
+                id: interaction.user.id,
+                allow: [
+                  PermissionFlagsBits.ViewChannel,
+                  PermissionFlagsBits.SendMessages,
+                  PermissionFlagsBits.ReadMessageHistory,
+                  PermissionFlagsBits.AttachFiles,
+                  PermissionFlagsBits.EmbedLinks
+                ]
+              },
+              {
+                id: client.user.id,
+                allow: [
+                  PermissionFlagsBits.ViewChannel,
+                  PermissionFlagsBits.SendMessages,
+                  PermissionFlagsBits.ReadMessageHistory,
+                  PermissionFlagsBits.ManageChannels,
+                  PermissionFlagsBits.EmbedLinks
+                ]
+              },
+              ...(config.ownerId !== interaction.user.id ? [{
+                id: config.ownerId,
+                allow: [
+                  PermissionFlagsBits.ViewChannel,
+                  PermissionFlagsBits.SendMessages,
+                  PermissionFlagsBits.ReadMessageHistory,
+                  PermissionFlagsBits.AttachFiles,
+                  PermissionFlagsBits.EmbedLinks
+                ]
+              }] : [])
+            ]
+          });
+
+          const created = tickets.create({
+            guildId: interaction.guildId,
+            userId: interaction.user.id,
+            channelId: channel.id,
+            category: interaction.options.getString("category")
+          });
+          if (!created.created) {
+            await channel.delete("Duplicate open EM7 support ticket").catch(() => null);
+            const duplicateChannel = await interaction.guild.channels.fetch(created.ticket.channel_id).catch(() => null);
+            return interaction.editReply({
+              content: duplicateChannel
+                ? "لديك تذكرة مفتوحة بالفعل: " + duplicateChannel
+                : "لديك تذكرة مفتوحة بالفعل. حاول تحديث القناة أو تواصل مع الإدارة."
+            });
+          }
+
+          await channel.setTopic(
+            "EM7 Support | Ticket #" + created.ticket.id + " | " +
+            TICKET_CATEGORIES[created.ticket.category]
+          );
+          const embed = new EmbedBuilder()
+            .setColor(0x7655c9)
+            .setAuthor({ name: "EM7 HOST • SUPPORT CENTER" })
+            .setTitle("تذكرة دعم جديدة #" + created.ticket.id)
+            .setDescription(String(interaction.options.getString("details")).slice(0, 900))
+            .addFields(
+              { name: "صاحب التذكرة", value: "<@" + interaction.user.id + ">", inline: true },
+              { name: "القسم", value: TICKET_CATEGORIES[created.ticket.category], inline: true },
+              { name: "الحالة", value: "مفتوحة", inline: true }
+            )
+            .setFooter({ text: "EM7 SYSTEM • Support" })
+            .setTimestamp();
+          await channel.send({
+            embeds: [embed],
+            components: [ticketControls()],
+            allowedMentions: { users: [interaction.user.id], parse: [] }
+          });
+          audit(db, interaction.user.id, "support.ticket.open", {
+            ticketId: created.ticket.id,
+            guildId: interaction.guildId,
+            channelId: channel.id,
+            category: created.ticket.category
+          });
+          return interaction.editReply({ content: "تم فتح تذكرة الدعم الخاصة بك: " + channel });
+        } catch (error) {
+          if (channel) await channel.delete("Rollback failed EM7 support ticket").catch(() => null);
+          throw error;
+        }
       }
 
       if (sub === "host-room") {
