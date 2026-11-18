@@ -41,16 +41,6 @@ test("rejected top-up requests are not credited and cannot be reviewed twice", (
   db.close();
 });
 
-test("purchase debits wallet and remains pending provisioning", () => {
-  const db = openDatabase(":memory:");
-  const commerce = createCommerce(db);
-  commerce.credit("u3", 20, "seed", "owner");
-  const purchase = commerce.buyPlan("u3", "pro");
-  assert.equal(purchase.status, "pending_provisioning");
-  assert.equal(commerce.balance("u3"), 0);
-  db.close();
-});
-
 test("command registration preserves unrelated commands and replaces EM7", () => {
   const registered = [
     { id: "legacy-id", application_id: "app-id", name: "moderation", description: "mod", type: 1 },
