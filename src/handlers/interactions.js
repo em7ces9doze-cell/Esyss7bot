@@ -71,6 +71,16 @@ function adminPanelRows() {
         .setLabel("طلبات شحن العملات")
         .setStyle(ButtonStyle.Secondary)
     ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("em7_economy_stats")
+        .setLabel("ملخص العملات")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId("em7_audit_log")
+        .setLabel("سجل الإدارة")
+        .setStyle(ButtonStyle.Secondary)
+    ),
     hostLinkRow()
   ];
 }
@@ -192,12 +202,46 @@ function createInteractionHandler({ config, commerce, db, client }) {
   return async function handle(interaction) {
     try {
       if (interaction.isButton()) {
-        if (!["em7_host_create_room", "em7_admin_status", "em7_topup_requests"].includes(interaction.customId)) return;
+        if (!["em7_host_create_room", "em7_admin_status", "em7_topup_requests", "em7_economy_stats", "em7_audit_log"].includes(interaction.customId)) return;
         if (interaction.user.id !== config.ownerId) {
           return interaction.reply({ content: "هذا الإجراء مخصص لإدارة EM7.", ephemeral: true });
         }
         if (interaction.customId === "em7_admin_status") {
           return interaction.reply({ embeds: [statusEmbed(client)], ephemeral: true });
+        }
+        if (interaction.customId === "em7_economy_stats") {
+          const stats = commerce.adminSummary();
+          const embed = new EmbedBuilder()
+            .setColor(0x7655c9)
+            .setTitle("EM7 Coins | الملخص المالي")
+            .addFields(
+              { name: "المحافظ المسجلة", value: String(stats.wallets.users), inline: true },
+              { name: "إجمالي العملات", value: Number(stats.wallets.coins).toLocaleString("en-US"), inline: true },
+              { name: "طلبات معلقة", value: String(stats.pendingTopups.count) + " • " + Number(stats.pendingTopups.amount).toLocaleString("en-US") + " Coins", inline: false },
+              { name: "طلبات معتمدة", value: String(stats.approvedTopups.count) + " • " + Number(stats.approvedTopups.amount).toLocaleString("en-US") + " Coins", inline: false }
+            )
+            .setTimestamp();
+          return interaction.reply({ embeds: [embed], ephemeral: true });
+        }
+        if (interaction.customId === "em7_audit_log") {
+          const rows = commerce.listAudit(15);
+          const description = rows.length
+            ? rows.map(row =>
+              "`#" + row.id + "` • **" + String(row.action).slice(0, 70) +
+              "** • <@" + row.actor_id + "> • " + String(row.created_at)
+            ).join("\\n").slice(0, 3900)
+            : "لا توجد إجراءات مسجلة حتى الآن.";
+          const embed = new EmbedBuilder()
+            .setColor(0x7655c9)
+            .setTitle("EM7 | سجل إجراءات الإدارة")
+            .setDescription(description)
+            .setFooter({ text: "آخر 15 إجراءً" })
+            .setTimestamp();
+          return interaction.reply({
+            embeds: [embed],
+            ephemeral: true,
+            allowedMentions: { parse: [] }
+          });
         }
         if (interaction.customId === "em7_topup_requests") {
           const rows = commerce.listPending(15);
