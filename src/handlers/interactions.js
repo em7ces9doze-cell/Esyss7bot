@@ -99,14 +99,7 @@ function statusEmbed(client) {
 
 async function ensureHostChannel(guild, client) {
   const me = guild.members.me || await guild.members.fetch(client.user.id);
-  const required = [
-    PermissionFlagsBits.ManageChannels,
-    PermissionFlagsBits.SendMessages,
-    PermissionFlagsBits.EmbedLinks,
-    PermissionFlagsBits.ViewChannel,
-    PermissionFlagsBits.ReadMessageHistory
-  ];
-  if (!me.permissions.has(required)) {
+  if (!me.permissions.has(PermissionFlagsBits.ManageChannels)) {
     throw new Error("BOT_PERMISSION_MISSING");
   }
 
@@ -130,6 +123,15 @@ async function ensureHostChannel(guild, client) {
             PermissionFlagsBits.ReadMessageHistory
           ],
           deny: [PermissionFlagsBits.SendMessages]
+        },
+        {
+          id: client.user.id,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.EmbedLinks,
+            PermissionFlagsBits.ReadMessageHistory
+          ]
         }
       ]
     });
@@ -137,6 +139,15 @@ async function ensureHostChannel(guild, client) {
   }
 
   try {
+    const channelPermissions = channel.permissionsFor(me);
+    if (!channelPermissions || !channelPermissions.has([
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.SendMessages,
+      PermissionFlagsBits.EmbedLinks,
+      PermissionFlagsBits.ReadMessageHistory
+    ])) {
+      throw new Error("BOT_CHANNEL_PERMISSION_MISSING");
+    }
     const recent = await channel.messages.fetch({ limit: 50 });
     const existingPost = recent.find(message =>
       message.author.id === client.user.id &&
@@ -457,8 +468,10 @@ function createInteractionHandler({ config, commerce, db, client }) {
         code: error.code || error.name || "UNKNOWN"
       });
       const message = error.message === "BOT_PERMISSION_MISSING"
-        ? "البوت يحتاج صلاحيات: Manage Channels وView Channel وSend Messages وEmbed Links وRead Message History."
-        : "تعذر تنفيذ العملية. تحقق من صلاحيات البوت وسجلات الاستضافة، ثم أعد المحاولة.";
+        ? "البوت يحتاج صلاحية Manage Channels على مستوى السيرفر."
+        : error.message === "BOT_CHANNEL_PERMISSION_MISSING"
+          ? "البوت لا يملك صلاحيات View Channel وSend Messages وEmbed Links وRead Message History داخل قناة الموقع."
+          : "تعذر تنفيذ العملية. تحقق من صلاحيات البوت وسجلات الاستضافة، ثم أعد المحاولة.";
       if (interaction.deferred || interaction.replied) {
         return interaction.editReply({ content: message }).catch(() => null);
       }
