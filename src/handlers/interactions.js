@@ -281,7 +281,7 @@ function createInteractionHandler({ config, commerce, db, client }) {
             "**أوامر الإدارة**",
             "`/e7 admin-panel` — لوحة إدارة EM7 HOST",
             "`/e7 host-room` — إنشاء أو تحديث روم الموقع",
-            "`/e7 requests` و`/e7 approve-request` و`/e7 credit`"
+            "`/e7 requests` و`/e7 approve-request` و`/e7 reject-request` و`/e7 credit`"
           ].join("\n")
         });
       }
