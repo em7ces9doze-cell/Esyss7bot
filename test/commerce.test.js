@@ -40,18 +40,18 @@ test("purchase debits wallet and remains pending provisioning", () => {
 
 test("command registration preserves unrelated commands and replaces EM7", () => {
   const registered = [
-    { name: "moderation" },
-    { name: "e7", description: "old EM7" },
-    { name: "botfactory" },
-    { name: "music" }
+    { id: "legacy-id", application_id: "app-id", name: "moderation", description: "mod", type: 1 },
+    { id: "old-e7-id", application_id: "app-id", name: "e7", description: "old EM7", type: 1 },
+    { id: "legacy-botfactory-id", application_id: "app-id", name: "botfactory", description: "legacy", type: 1 },
+    { id: "music-id", application_id: "app-id", name: "music", description: "music", type: 1 }
   ];
   const desired = [{ name: "e7", description: "new EM7" }];
   assert.deepEqual(
     mergeApplicationCommands(registered, desired),
     [
-      { name: "moderation" },
-      { name: "music" },
-      { name: "e7", description: "new EM7" }
+      { name: "moderation", type: 1, description: "mod" },
+      { name: "music", type: 1, description: "music" },
+      { name: "e7", type: 1, description: "new EM7" }
     ]
   );
 });
