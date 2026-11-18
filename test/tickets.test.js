@@ -56,6 +56,7 @@ test("closed ticket allows the user to open a new ticket", () => {
     category: "other"
   });
   tickets.close("channel-4", "user-3");
+  assert.ok(tickets.findRecent("guild-3", "user-3", 60));
   const next = tickets.create({
     guildId: "guild-3",
     userId: "user-3",
