@@ -45,7 +45,7 @@ test("command registration preserves unrelated commands and replaces EM7", () =>
     { id: "legacy-botfactory-id", application_id: "app-id", name: "botfactory", description: "legacy", type: 1 },
     { id: "music-id", application_id: "app-id", name: "music", description: "music", type: 1 }
   ];
-  const desired = [{ name: "e7", description: "new EM7" }];
+  const desired = [{ name: "e7", type: 1, description: "new EM7" }];
   assert.deepEqual(
     mergeApplicationCommands(registered, desired),
     [
