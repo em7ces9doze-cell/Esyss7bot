@@ -461,6 +461,13 @@ function createInteractionHandler({ config, commerce, tickets, db, client }) {
           }
           tickets.close(existing.channel_id, config.ownerId);
         }
+        const recentTicket = tickets.findRecent(interaction.guildId, interaction.user.id, 60);
+        if (recentTicket) {
+          return interaction.reply({
+            content: "لحماية السيرفر من تكرار القنوات، انتظر دقيقة قبل فتح تذكرة جديدة.",
+            ephemeral: true
+          });
+        }
 
         await interaction.deferReply({ ephemeral: true });
         let channel = null;
