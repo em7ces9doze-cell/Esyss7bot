@@ -19,6 +19,12 @@ function createCommerce(db) {
   return {userId:request.user_id,amount:request.amount,reason:String(reason).slice(0,200)};
  });
 
- return { balance, credit:creditTx, debit:debitTx, requestTopup:requestTx, approveTopup:approveTx, rejectTopup:rejectTx, listPending:(limit=10)=>db.prepare("SELECT id,user_id,amount,note,created_at FROM topup_requests WHERE status='pending' ORDER BY id LIMIT ?").all(Math.min(Math.max(limit,1),50)), ledger:(userId,limit=10)=>db.prepare("SELECT id,delta,balance_after,reason,created_at FROM ledger WHERE user_id=? ORDER BY id DESC LIMIT ?").all(userId,Math.min(Math.max(limit,1),25)) };
+ const listAudit = (limit=15) => db.prepare("SELECT id,actor_id,action,details,created_at FROM audit_log ORDER BY id DESC LIMIT ?").all(Math.min(Math.max(limit,1),50));
+ const adminSummary = () => ({
+  wallets: db.prepare("SELECT COUNT(*) AS users, COALESCE(SUM(balance),0) AS coins FROM wallets").get(),
+  pendingTopups: db.prepare("SELECT COUNT(*) AS count, COALESCE(SUM(amount),0) AS amount FROM topup_requests WHERE status='pending'").get(),
+  approvedTopups: db.prepare("SELECT COUNT(*) AS count, COALESCE(SUM(amount),0) AS amount FROM topup_requests WHERE status='approved'").get()
+ });
+ return { balance, credit:creditTx, debit:debitTx, requestTopup:requestTx, approveTopup:approveTx, rejectTopup:rejectTx, adminSummary, listAudit, listPending:(limit=10)=>db.prepare("SELECT id,user_id,amount,note,created_at FROM topup_requests WHERE status='pending' ORDER BY id LIMIT ?").all(Math.min(Math.max(limit,1),50)), ledger:(userId,limit=10)=>db.prepare("SELECT id,delta,balance_after,reason,created_at FROM ledger WHERE user_id=? ORDER BY id DESC LIMIT ?").all(userId,Math.min(Math.max(limit,1),25)) };
 }
 module.exports = { createCommerce };
